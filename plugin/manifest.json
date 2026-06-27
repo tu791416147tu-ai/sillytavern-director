@@ -1,0 +1,8 @@
+{
+  "display_name": "酒馆导演插件",
+  "version": "1.0.0",
+  "description": "多角色对话导演调度系统 —— 数据适配 + 导演调度 + 可视化控制台",
+  "author": "TavernDirector",
+  "js": "index.js",
+  "css": ""
+}

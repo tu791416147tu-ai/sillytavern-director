@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>酒馆导演插件 — 数据预览</title>
+  <style>
+    :root {
+      --bg: #1a1a2e;
+      --surface: #16213e;
+      --surface2: #0f3460;
+      --text: #e0e0e0;
+      --text2: #a0a0b0;
+      --accent: #e94560;
+      --accent2: #53a8b6;
+      --success: #4caf50;
+      --warning: #ff9800;
+      --error: #f44336;
+      --border: #2a2a4a;
+      --radius: 8px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding: 16px;
+      line-height: 1.5;
+    }
+
+    /* ── 头部 ─────────────────────────────── */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .header h1 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--accent);
+    }
+
+    .header .version {
+      font-size: 12px;
+      color: var(--text2);
+      background: var(--surface);
+      padding: 2px 8px;
+      border-radius: 4px;
+    }
+
+    .mode-badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .mode-badge.live {
+      background: var(--accent2);
+      color: #fff;
+    }
+
+    .mode-badge.import {
+      background: var(--warning);
+      color: #000;
+    }
+
+    /* ── 操作栏 ───────────────────────────── */
+    .toolbar {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      padding: 8px 16px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      color: var(--text);
+      cursor: pointer;
+      font-size: 13px;
+      transition: all 0.2s;
+    }
+
+    .btn:hover {
+      background: var(--surface2);
+      border-color: var(--accent);
+    }
+
+    .btn.primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    .btn.primary:hover {
+      opacity: 0.9;
+    }
+
+    .btn.accent {
+      background: var(--accent2);
+      border-color: var(--accent2);
+      color: #fff;
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 0;
+    }
+
+    .btn-group .btn {
+      border-radius: 0;
+    }
+
+    .btn-group .btn:first-child {
+      border-radius: var(--radius) 0 0 var(--radius);
+    }
+
+    .btn-group .btn:last-child {
+      border-radius: 0 var(--radius) var(--radius) 0;
+    }
+
+    /* ── 卡片网格 ──────────────────────────── */
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+      text-align: center;
+    }
+
+    .stat-card .stat-value {
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--accent2);
+    }
+
+    .stat-card .stat-label {
+      font-size: 11px;
+      color: var(--text2);
+      margin-top: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .stat-card.warning .stat-value { color: var(--warning); }
+    .stat-card.success .stat-value { color: var(--success); }
+
+    /* ── 面板区块 ──────────────────────────── */
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 16px;
+      overflow: hidden;
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 16px;
+      background: var(--surface2);
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .panel-header h3 {
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .panel-header .count {
+      font-size: 12px;
+      color: var(--text2);
+      background: var(--bg);
+      padding: 2px 8px;
+      border-radius: 10px;
+    }
+
+    .panel-body {
+      padding: 12px 16px;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+
+    .panel-body.empty {
+      color: var(--text2);
+      font-style: italic;
+      text-align: center;
+      padding: 24px;
+    }
+
+    /* ── 列表项 ────────────────────────────── */
+    .list-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .list-item:last-child {
+      border-bottom: none;
+    }
+
+    .list-item .avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: var(--surface2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      color: var(--text2);
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+
+    .list-item .avatar img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .list-item .info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .list-item .name {
+      font-weight: 600;
+      font-size: 13px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .list-item .detail {
+      font-size: 11px;
+      color: var(--text2);
+    }
+
+    .list-item .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .status-dot.enabled { background: var(--success); }
+    .status-dot.disabled { background: var(--error); }
+    .status-dot.warning { background: var(--warning); }
+
+    /* ── 消息气泡 ──────────────────────────── */
+    .msg-item {
+      padding: 6px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .msg-item:last-child { border-bottom: none; }
+
+    .msg-meta {
+      display: flex;
+      gap: 8px;
+      font-size: 11px;
+      color: var(--text2);
+      margin-bottom: 2px;
+    }
+
+    .msg-role {
+      font-weight: 600;
+      color: var(--accent2);
+    }
+
+    .msg-speaker {
+      font-weight: 600;
+    }
+
+    .msg-content {
+      font-size: 13px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* ── 破限区域 ──────────────────────────── */
+    .jailbreak-text {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px;
+      font-size: 12px;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      white-space: pre-wrap;
+      max-height: 200px;
+      overflow-y: auto;
+      color: var(--text2);
+    }
+
+    /* ── 错误列表 ──────────────────────────── */
+    .issue-item {
+      display: flex;
+      gap: 8px;
+      padding: 6px 0;
+      font-size: 12px;
+      align-items: flex-start;
+    }
+
+    .issue-severity {
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      flex-shrink: 0;
+    }
+
+    .issue-severity.error { background: var(--error); color: #fff; }
+    .issue-severity.warning { background: var(--warning); color: #000; }
+    .issue-severity.info { background: var(--accent2); color: #fff; }
+
+    /* ── 文件导入区 ────────────────────────── */
+    .drop-zone {
+      border: 2px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 32px;
+      text-align: center;
+      color: var(--text2);
+      transition: all 0.2s;
+      cursor: pointer;
+    }
+
+    .drop-zone:hover, .drop-zone.drag-over {
+      border-color: var(--accent);
+      background: var(--surface2);
+    }
+
+    .drop-zone input[type="file"] {
+      display: none;
+    }
+
+    /* ── 响应式 ────────────────────────────── */
+    @media (max-width: 480px) {
+      .stats {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .toolbar {
+        flex-direction: column;
+      }
+
+      .btn {
+        width: 100%;
+        text-align: center;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ═══ 头部 ═══════════════════════════════════════════ -->
+  <div class="header">
+    <h1>🎬 酒馆导演插件</h1>
+    <span class="version">v0.1.0</span>
+  </div>
+
+  <div class="header" style="border-bottom: none; padding-bottom: 0;">
+    <span style="font-size: 13px; color: var(--text2);">数据适配层 · 状态预览</span>
+    <span class="mode-badge live" id="modeBadge">未连接</span>
+  </div>
+
+  <!-- ═══ 操作栏 ═════════════════════════════════════════ -->
+  <div class="toolbar">
+    <button class="btn primary" id="btnRefresh" onclick="refreshData()">
+      🔄 刷新数据
+    </button>
+    <button class="btn" id="btnLiveMode" onclick="toggleLiveMode()">
+      ▶ 开始监听
+    </button>
+    <label class="btn" for="fileInput">
+      📁 导入文件...
+    </label>
+    <input type="file" id="fileInput" multiple accept=".json,.txt,.md,.png,.jpg,.jpeg,.webp" onchange="handleFileImport(event)" style="display:none;">
+    <button class="btn" id="btnValidate" onclick="runValidation()">
+      ✅ 校验会话
+    </button>
+  </div>
+
+  <!-- ═══ 统计卡片 ═══════════════════════════════════════ -->
+  <div class="stats">
+    <div class="stat-card">
+      <div class="stat-value" id="statMode">—</div>
+      <div class="stat-label">当前模式</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="statChars">0</div>
+      <div class="stat-label">角色数</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="statMsgs">0</div>
+      <div class="stat-label">消息数</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="statWB">0</div>
+      <div class="stat-label">世界书条目</div>
+    </div>
+    <div class="stat-card" id="statJailbreakCard">
+      <div class="stat-value" id="statJailbreak">未加载</div>
+      <div class="stat-label">破限状态</div>
+    </div>
+  </div>
+
+  <!-- ═══ 角色列表 ═══════════════════════════════════════ -->
+  <div class="panel">
+    <div class="panel-header" onclick="togglePanel('charPanel')">
+      <h3>👥 角色列表</h3>
+      <span class="count" id="charCount">0</span>
+    </div>
+    <div class="panel-body" id="charPanel"></div>
+  </div>
+
+  <!-- ═══ 消息列表 ═══════════════════════════════════════ -->
+  <div class="panel">
+    <div class="panel-header" onclick="togglePanel('msgPanel')">
+      <h3>💬 最近消息</h3>
+      <span class="count" id="msgCount">0</span>
+    </div>
+    <div class="panel-body" id="msgPanel"></div>
+  </div>
+
+  <!-- ═══ 世界书 ═════════════════════════════════════════ -->
+  <div class="panel">
+    <div class="panel-header" onclick="togglePanel('wbPanel')">
+      <h3>📖 世界书条目</h3>
+      <span class="count" id="wbCount">0</span>
+    </div>
+    <div class="panel-body" id="wbPanel"></div>
+  </div>
+
+  <!-- ═══ 破限/系统提示 ══════════════════════════════════ -->
+  <div class="panel">
+    <div class="panel-header" onclick="togglePanel('jbPanel')">
+      <h3>🔓 破限/系统提示</h3>
+      <span class="count" id="jbStatus">—</span>
+    </div>
+    <div class="panel-body" id="jbPanel">
+      <div class="jailbreak-text" id="jbText">等待数据加载...</div>
+    </div>
+  </div>
+
+  <!-- ═══ 校验结果 ═══════════════════════════════════════ -->
+  <div class="panel" id="validationPanel" style="display: none;">
+    <div class="panel-header" onclick="togglePanel('valPanel')">
+      <h3 id="valHeader">🔍 校验结果</h3>
+      <span class="count" id="valCount">0</span>
+    </div>
+    <div class="panel-body" id="valPanel"></div>
+  </div>
+
+  <!-- ═══ 导入预览 ═══════════════════════════════════════ -->
+  <div class="panel" id="importPanel" style="display: none;">
+    <div class="panel-header">
+      <h3>📥 导入预览</h3>
+      <span class="count" id="importFileCount">0 文件</span>
+    </div>
+    <div class="panel-body" id="importPreview"></div>
+  </div>
+
+  <script>
+    // ═══════════════════════════════════════════════════════
+    // UI 控制逻辑
+    // ═══════════════════════════════════════════════════════
+
+    let liveModeActive = false;
+    let importedFiles = [];
+
+    // ── 从父窗口获取适配器 ──────────────────────────
+    function getAdapter() {
+      // settings.html 在 iframe 中运行，父窗口才有 TavernDirector
+      const win = window.parent || window;
+      return win.TavernDirector || null;
+    }
+
+    // ── 刷新数据 ───────────────────────────────────
+    function refreshData() {
+      const TD = getAdapter();
+      if (!TD) {
+        showError('未检测到插件。请确认插件已在酒馆中加载。');
+        return;
+      }
+
+      try {
+        const summary = TD.getSummary();
+        renderSummary(summary);
+        renderSession(TD.getSnapshot());
+        updateModeBadge('live');
+        hideValidation();
+      } catch (e) {
+        showError('读取数据失败: ' + e.message);
+      }
+    }
+
+    // ── 实时监听 ───────────────────────────────────
+    function toggleLiveMode() {
+      const TD = getAdapter();
+      if (!TD) { showError('插件未加载'); return; }
+
+      const btn = document.getElementById('btnLiveMode');
+
+      if (liveModeActive) {
+        TD.stopLiveMode();
+        liveModeActive = false;
+        btn.textContent = '▶ 开始监听';
+        btn.classList.remove('accent');
+        updateModeBadge('stopped');
+      } else {
+        btn.textContent = '⏸ 停止监听';
+        btn.classList.add('accent');
+        TD.startLiveMode(function (data) {
+          // data 是 UnifiedSession，用 getSummary() 获取正确统计
+          renderSummary(TD.getSummary());
+          renderSession(TD.getSnapshot());
+          updateModeBadge('live');
+        });
+        liveModeActive = true;
+      }
+    }
+
+    // ── 文件导入 ───────────────────────────────────
+    function handleFileImport(event) {
+      const files = event.target.files;
+      if (!files || files.length === 0) return;
+
+      Array.from(files).forEach(file => {
+        const ext = file.name.split('.').pop().toLowerCase();
+
+        if (ext === 'json') {
+          const reader = new FileReader();
+          reader.onload = function (e) {
+            try {
+              const json = JSON.parse(e.target.result);
+              importedFiles.push({ name: file.name, type: 'json', data: json });
+              renderImportPreview();
+            } catch (err) {
+              showError('JSON 解析失败: ' + file.name + ' — ' + err.message);
+            }
+          };
+          reader.readAsText(file);
+        } else if (ext === 'txt' || ext === 'md') {
+          const reader = new FileReader();
+          reader.onload = function (e) {
+            importedFiles.push({ name: file.name, type: 'text', data: e.target.result });
+            renderImportPreview();
+          };
+          reader.readAsText(file);
+        } else if (['png', 'jpg', 'jpeg', 'webp'].includes(ext)) {
+          importedFiles.push({ name: file.name, type: 'image', data: file });
+          renderImportPreview();
+        }
+      });
+
+      // 重置 input
+      event.target.value = '';
+    }
+
+    function renderImportPreview() {
+      const panel = document.getElementById('importPanel');
+      const preview = document.getElementById('importPreview');
+      const countEl = document.getElementById('importFileCount');
+
+      if (importedFiles.length === 0) {
+        panel.style.display = 'none';
+        return;
+      }
+
+      panel.style.display = 'block';
+      countEl.textContent = importedFiles.length + ' 文件';
+
+      const typeLabels = { json: 'JSON', text: '文本', image: '图片' };
+      preview.innerHTML = importedFiles.map((f, i) => `
+        <div class="list-item">
+          <span style="font-size: 20px;">${f.type === 'json' ? '📋' : f.type === 'text' ? '📝' : '🖼️'}</span>
+          <div class="info">
+            <div class="name">${escapeHtml(f.name)}</div>
+            <div class="detail">${typeLabels[f.type] || f.type}</div>
+          </div>
+          <button class="btn" onclick="removeImport(${i})" style="font-size: 11px;">✕</button>
+        </div>
+      `).join('');
+
+      if (importedFiles.length > 0) {
+        preview.innerHTML += `
+          <div style="margin-top: 12px; text-align: center;">
+            <button class="btn primary" onclick="confirmImport()">✅ 确认导入到会话</button>
+          </div>
+        `;
+      }
+    }
+
+    function removeImport(index) {
+      importedFiles.splice(index, 1);
+      renderImportPreview();
+    }
+
+    function confirmImport() {
+      const TD = getAdapter();
+      if (!TD) { showError('插件未加载，无法导入'); return; }
+
+      let importedCount = 0;
+      let errorCount = 0;
+
+      importedFiles.forEach(function(f) {
+        try {
+          if (f.type === 'json') {
+            TD.adapter.importFromData(f.data, f.name, 'json');
+          } else if (f.type === 'text') {
+            TD.adapter.importFromData(f.data, f.name, 'text');
+          } else if (f.type === 'image') {
+            // 图片类型暂直接标记为角色卡（base64 data）
+            TD.adapter.importFromData({ name: f.name.replace(/\.[^.]+$/, ''), image: true }, f.name, 'json');
+          }
+          importedCount++;
+        } catch (e) {
+          errorCount++;
+          console.error('[Preview] 导入失败:', f.name, e);
+        }
+      });
+
+      // 刷新显示
+      refreshData();
+
+      // 清空导入列表
+      importedFiles = [];
+      renderImportPreview();
+
+      if (errorCount > 0) {
+        showError('导入完成：' + importedCount + ' 个成功，' + errorCount + ' 个失败');
+      }
+    }
+
+    // ── 校验 ──────────────────────────────────────
+    function runValidation() {
+      const TD = getAdapter();
+      if (!TD) { showError('插件未加载'); return; }
+
+      const session = TD.getSnapshot();
+      const issues = validateManually(session);
+
+      const panel = document.getElementById('validationPanel');
+      const body = document.getElementById('valPanel');
+      const countEl = document.getElementById('valCount');
+      const header = document.getElementById('valHeader');
+
+      panel.style.display = 'block';
+
+      const errors = issues.filter(i => i.severity === 'error');
+      const warnings = issues.filter(i => i.severity === 'warning');
+
+      header.textContent = errors.length > 0
+        ? `❌ 校验失败 (${errors.length} 个错误)`
+        : warnings.length > 0
+          ? `⚠️ 校验通过 (${warnings.length} 个警告)`
+          : '✅ 校验全部通过';
+
+      countEl.textContent = issues.length;
+
+      if (issues.length === 0) {
+        body.innerHTML = '<div class="panel-body empty">✅ 数据结构完整，没有发现问题。</div>';
+      } else {
+        body.innerHTML = issues.map(i => `
+          <div class="issue-item">
+            <span class="issue-severity ${i.severity}">${i.severity}</span>
+            <span>
+              <strong>${escapeHtml(i.path)}</strong> — ${escapeHtml(i.message)}
+            </span>
+          </div>
+        `).join('');
+      }
+    }
+
+    function validateManually(session) {
+      const issues = [];
+
+      if (!session.sessionId) {
+        issues.push({ severity: 'error', path: 'sessionId', message: '会话 ID 不能为空' });
+      }
+
+      if (!session.characters || session.characters.length === 0) {
+        issues.push({ severity: 'warning', path: 'characters', message: '没有加载任何角色（允许空白草稿）' });
+      } else {
+        session.characters.forEach((c, i) => {
+          if (!c.name || c.name.trim() === '') {
+            issues.push({ severity: 'error', path: `characters[${i}].name`, message: '角色名不能为空' });
+          }
+        });
+      }
+
+      if (session.messages && session.messages.length > 0) {
+        session.messages.forEach((m, i) => {
+          if (m.role === 'character' && (!m.speaker || m.speaker.trim() === '')) {
+            issues.push({ severity: 'error', path: `messages[${i}].speaker`, message: '角色消息缺少发言者' });
+          }
+        });
+      }
+
+      if (session.worldBooks) {
+        session.worldBooks.forEach((w, i) => {
+          if (!w.content || w.content.trim() === '') {
+            issues.push({ severity: 'warning', path: `worldBooks[${i}].content`, message: `世界书条目 "${w.title}" 内容为空` });
+          }
+        });
+      }
+
+      if (!session.jailbreak || !session.jailbreak.text) {
+        issues.push({ severity: 'info', path: 'jailbreak', message: '破限未加载（已标记）' });
+      }
+
+      return issues;
+    }
+
+    function hideValidation() {
+      document.getElementById('validationPanel').style.display = 'none';
+    }
+
+    // ── 渲染更新 ──────────────────────────────────
+    function renderSummary(s) {
+      document.getElementById('statMode').textContent = s.mode === 'live' ? '实时' : '导入';
+      document.getElementById('statChars').textContent = s.characterCount;
+      document.getElementById('statMsgs').textContent = s.messageCount;
+      document.getElementById('statWB').textContent = s.worldBookCount;
+
+      const jbEl = document.getElementById('statJailbreak');
+      const jbCard = document.getElementById('statJailbreakCard');
+      if (s.jailbreakLoaded) {
+        jbEl.textContent = '已加载';
+        jbCard.className = 'stat-card success';
+      } else {
+        jbEl.textContent = '未加载';
+        jbCard.className = 'stat-card warning';
+      }
+    }
+
+    function renderSession(session) {
+      if (!session) return;
+
+      // ── 角色 ─────────────────────────────────
+      const charPanel = document.getElementById('charPanel');
+      const chars = session.characters || [];
+      document.getElementById('charCount').textContent = chars.length;
+      if (chars.length === 0) {
+        charPanel.innerHTML = '<div class="panel-body empty">暂无角色数据。在实时模式下连接酒馆，或导入角色卡。</div>';
+      } else {
+        charPanel.innerHTML = chars.map(c => `
+          <div class="list-item">
+            <div class="avatar">${c.avatar ? '<img src="' + escapeHtml(c.avatar) + '" onerror="this.style.display=\'none\'">' : '👤'}</div>
+            <div class="info">
+              <div class="name">${escapeHtml(c.name)} ${c.isNarrator ? '(旁白)' : ''}</div>
+              <div class="detail">${escapeHtml(c.model || '默认模型')} · ${c.prompt ? '有提示词' : '无提示词'}</div>
+            </div>
+            <span class="status-dot ${c.status === 'enabled' ? 'enabled' : 'disabled'}"></span>
+          </div>
+        `).join('');
+      }
+
+      // ── 消息（最近 20 条） ───────────────────
+      const msgPanel = document.getElementById('msgPanel');
+      const msgs = (session.messages || []).slice(-20);
+      document.getElementById('msgCount').textContent = (session.messages || []).length;
+      if (msgs.length === 0) {
+        msgPanel.innerHTML = '<div class="panel-body empty">暂无消息。开始对话或导入聊天记录。</div>';
+      } else {
+        msgPanel.innerHTML = msgs.map(m => `
+          <div class="msg-item">
+            <div class="msg-meta">
+              <span class="msg-role">${escapeHtml(m.role)}</span>
+              <span class="msg-speaker">${escapeHtml(m.speaker || '—')}</span>
+              <span>#${m.turnIndex}</span>
+            </div>
+            <div class="msg-content">${escapeHtml((m.content || '').slice(0, 100))}</div>
+          </div>
+        `).join('');
+      }
+
+      // ── 世界书 ───────────────────────────────
+      const wbPanel = document.getElementById('wbPanel');
+      const wbs = session.worldBooks || [];
+      document.getElementById('wbCount').textContent = wbs.length;
+      if (wbs.length === 0) {
+        wbPanel.innerHTML = '<div class="panel-body empty">暂无世界书条目。导入世界书 JSON 或连接酒馆获取。</div>';
+      } else {
+        wbPanel.innerHTML = wbs.map(w => `
+          <div class="list-item">
+            <span style="font-size: 20px;">📖</span>
+            <div class="info">
+              <div class="name">${escapeHtml(w.title || '未命名')}</div>
+              <div class="detail">
+                ${w.keys && w.keys.length > 0 ? '🔑 ' + w.keys.slice(0, 3).join(', ') : '无触发词'} ·
+                深度:${w.depth} · ${w.constant ? '恒定' : '关键词'}
+              </div>
+            </div>
+            <span class="status-dot ${w.enabled ? 'enabled' : 'disabled'}"></span>
+          </div>
+        `).join('');
+      }
+
+      // ── 破限 ─────────────────────────────────
+      const jb = session.jailbreak;
+      document.getElementById('jbStatus').textContent = jb && jb.enabled ? '已启用' : '未启用';
+      document.getElementById('jbText').textContent = jb && jb.text
+        ? jb.text.slice(0, 500) + (jb.text.length > 500 ? '\n...（已截断）' : '')
+        : '（空）';
+    }
+
+    function updateModeBadge(mode) {
+      const badge = document.getElementById('modeBadge');
+      badge.className = 'mode-badge ' + (mode === 'live' ? 'live' : mode === 'stopped' ? '' : 'import');
+      badge.textContent = mode === 'live' ? '实时模式' : mode === 'stopped' ? '已停止' : '导入模式';
+    }
+
+    // ── 工具函数 ──────────────────────────────────
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function showError(msg) {
+      const panel = document.getElementById('validationPanel');
+      const body = document.getElementById('valPanel');
+      const header = document.getElementById('valHeader');
+      panel.style.display = 'block';
+      header.textContent = '❌ 错误';
+      body.innerHTML = '<div class="issue-item"><span class="issue-severity error">ERROR</span><span>' + escapeHtml(msg) + '</span></div>';
+    }
+
+    function togglePanel(id) {
+      const body = document.getElementById(id);
+      if (body.style.display === 'none') {
+        body.style.display = '';
+      } else {
+        body.style.display = 'none';
+      }
+    }
+
+    // ── 页面初始化 ─────────────────────────────────
+    document.addEventListener('DOMContentLoaded', function () {
+      console.log('[TavernDirector] 预览面板已就绪');
+
+      // 延迟尝试刷新（等父窗口初始化完成）
+      setTimeout(function () {
+        const TD = getAdapter();
+        if (TD) {
+          refreshData();
+        } else {
+          console.log('[TavernDirector] 父窗口插件未就绪，显示离线状态');
+          updateModeBadge('import');
+          document.getElementById('statMode').textContent = '离线';
+        }
+      }, 1000);
+    });
+  </script>
+
+</body>
+</html>

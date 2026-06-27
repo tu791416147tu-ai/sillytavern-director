@@ -1,0 +1,998 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>酒馆导演台</title>
+<style>
+/* ═══════════════════════════════════════════════════════
+   全局变量 & 基础
+   ═══════════════════════════════════════════════════════ */
+:root {
+  --bg: #0f0f1a;
+  --surface: #1a1a2e;
+  --surface2: #16213e;
+  --elevated: #1f2b47;
+  --border: #2a2a4a;
+  --text: #e0e0e0;
+  --text2: #9090a8;
+  --muted: #5a5a78;
+  --accent: #e94560;
+  --accent2: #53a8b6;
+  --gold: #f0c060;
+  --success: #4caf50;
+  --warning: #ff9800;
+  --error: #f44336;
+  --info: #2196f3;
+  --radius: 6px;
+  --radius-lg: 10px;
+  --shadow: 0 2px 12px rgba(0,0,0,0.3);
+  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans SC', sans-serif;
+  --mono: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  font-size: 13px;
+  line-height: 1.5;
+}
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+/* ═══════════════════════════════════════════════════════
+   1) 顶部状态栏
+   ═══════════════════════════════════════════════════════ */
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  min-height: 44px;
+  flex-wrap: wrap;
+}
+.topbar .brand {
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--accent);
+  white-space: nowrap;
+  margin-right: 6px;
+}
+.topbar .sep { width: 1px; height: 20px; background: var(--border); margin: 0 4px; }
+.topbar .status-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+}
+.status-dot.on { background: var(--success); box-shadow: 0 0 6px var(--success); }
+.status-dot.off { background: var(--error); }
+.status-dot.loading { background: var(--warning); animation: pulse 1s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+.mode-switch {
+  display: flex; background: var(--bg); border-radius: var(--radius);
+  border: 1px solid var(--border); overflow: hidden;
+}
+.mode-switch button {
+  padding: 5px 12px; background: transparent; color: var(--text2);
+  border: none; cursor: pointer; font-size: 12px; transition: .15s;
+}
+.mode-switch button.active {
+  background: var(--accent); color: #fff;
+}
+
+.topbar .spacer { flex: 1; }
+
+.btn {
+  padding: 5px 12px; border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--surface2); color: var(--text); cursor: pointer;
+  font-size: 12px; white-space: nowrap; transition: .15s;
+}
+.btn:hover { border-color: var(--accent); background: var(--elevated); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn.accent { background: var(--accent2); border-color: var(--accent2); color: #fff; }
+.btn.warn { border-color: var(--warning); color: var(--warning); }
+.btn:disabled { opacity: 0.4; pointer-events: none; }
+
+/* ═══════════════════════════════════════════════════════
+   主体布局：三栏
+   ═══════════════════════════════════════════════════════ */
+.main {
+  display: flex; flex: 1; overflow: hidden;
+}
+.left-panel {
+  width: 220px; flex-shrink: 0; background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.center-panel {
+  flex: 1; display: flex; flex-direction: column;
+  overflow: hidden; min-width: 0;
+}
+.right-panel {
+  width: 300px; flex-shrink: 0; background: var(--surface);
+  border-left: 1px solid var(--border);
+  display: flex; flex-direction: column; overflow-y: auto;
+}
+.bottom-bar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 14px; background: var(--surface);
+  border-top: 1px solid var(--border); flex-shrink: 0;
+  min-height: 44px; flex-wrap: wrap;
+}
+
+/* ── 左侧：角色列表 ─────────────────────── */
+.left-panel .panel-title {
+  padding: 10px 14px; font-size: 12px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .5px;
+  color: var(--text2); border-bottom: 1px solid var(--border);
+  display: flex; justify-content: space-between; align-items: center;
+}
+.role-list { flex: 1; overflow-y: auto; padding: 6px; }
+.role-card {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px; border-radius: var(--radius); cursor: pointer;
+  border: 1px solid transparent; margin-bottom: 4px; transition: .15s;
+}
+.role-card:hover { background: var(--surface2); }
+.role-card.selected { border-color: var(--accent2); background: rgba(83,168,182,.1); }
+.role-card.disabled { opacity: .5; }
+.role-card .rc-avatar {
+  width: 30px; height: 30px; border-radius: 50%; background: var(--elevated);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; flex-shrink: 0; overflow: hidden;
+}
+.role-card .rc-avatar img { width:100%; height:100%; object-fit:cover; }
+.role-card .rc-info { flex:1; min-width:0; }
+.role-card .rc-name { font-weight:600; font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.role-card .rc-model { font-size:10px; color:var(--text2); }
+.role-card .rc-badge {
+  font-size: 9px; padding: 2px 6px; border-radius: 8px;
+  background: var(--accent2); color: #fff; white-space: nowrap;
+}
+.role-card .rc-badge.narrator { background: var(--gold); color: #000; }
+
+/* ── 中间：聊天区 ──────────────────────── */
+.chat-header {
+  padding: 8px 14px; border-bottom: 1px solid var(--border);
+  font-size: 12px; color: var(--text2); display: flex; gap: 12px;
+}
+.chat-messages {
+  flex: 1; overflow-y: auto; padding: 10px 14px;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.msg-bubble {
+  max-width: 85%; padding: 8px 12px; border-radius: var(--radius-lg);
+  font-size: 12px; line-height: 1.5; animation: fadeIn .2s;
+}
+@keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+.msg-bubble.user { align-self: flex-end; background: var(--elevated); border: 1px solid var(--border); }
+.msg-bubble.character { align-self: flex-start; background: var(--surface2); border: 1px solid var(--accent2); }
+.msg-bubble.assistant { align-self: flex-start; background: var(--surface2); border: 1px solid var(--border); }
+.msg-bubble.system { align-self: center; background: transparent; border: 1px dashed var(--border); font-size: 11px; color: var(--text2); max-width: 95%; }
+.msg-bubble.director { align-self: center; background: rgba(240,192,96,.1); border: 1px solid var(--gold); font-size: 11px; }
+.msg-bubble .msg-speaker { font-weight: 700; font-size: 11px; margin-bottom: 2px; color: var(--accent2); }
+.msg-bubble .msg-speaker.user { color: var(--accent); }
+.msg-bubble .msg-speaker.director { color: var(--gold); }
+.turn-sep {
+  text-align: center; font-size: 10px; color: var(--muted);
+  padding: 8px 0; border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+}
+.typing-indicator {
+  align-self: flex-start; padding: 8px 12px; font-size: 11px;
+  color: var(--text2); font-style: italic; display: flex; gap: 4px;
+}
+.typing-indicator .dot { animation: bounce 1.4s infinite; }
+.typing-indicator .dot:nth-child(2) { animation-delay: .2s; }
+.typing-indicator .dot:nth-child(3) { animation-delay: .4s; }
+@keyframes bounce { 0%,80%,100%{opacity:0} 40%{opacity:1} }
+
+/* ── 右侧：数据预览 ─────────────────────── */
+.right-panel .panel-section {
+  border-bottom: 1px solid var(--border);
+}
+.right-panel .section-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 14px; cursor: pointer; user-select: none;
+  font-size: 12px; font-weight: 700; color: var(--text2);
+  text-transform: uppercase; letter-spacing: .5px;
+}
+.right-panel .section-header:hover { background: var(--surface2); }
+.right-panel .section-header .arrow { transition: .2s; font-size: 10px; }
+.right-panel .section-header .arrow.open { transform: rotate(90deg); }
+.right-panel .section-body { padding: 0 14px 10px; }
+.right-panel .section-body.collapsed { display: none; }
+
+.kv-row { display: flex; justify-content: space-between; padding: 3px 0; font-size: 11px; }
+.kv-row .kv-key { color: var(--text2); }
+.kv-row .kv-val { color: var(--text); font-weight: 500; text-align: right; max-width: 55%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.wb-item { padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 11px; }
+.wb-item:last-child { border-bottom: none; }
+.wb-item .wb-title { font-weight: 600; display: flex; gap: 6px; align-items: center; }
+.wb-item .wb-keys { color: var(--accent2); font-size: 10px; }
+.wb-item .wb-hit { font-size: 10px; padding: 1px 6px; border-radius: 4px; }
+.wb-item .wb-hit.yes { background: rgba(76,175,80,.2); color: var(--success); }
+.wb-item .wb-hit.no { color: var(--muted); }
+
+.log-item { padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 11px; }
+.log-item:last-child { border-bottom: none; }
+.log-item .log-time { color: var(--muted); font-size: 10px; }
+.log-item .log-roles { color: var(--accent2); }
+.log-item .log-reason { color: var(--text2); margin-top: 2px; }
+
+.director-status {
+  display: flex; align-items: center; gap: 6px; padding: 6px 0; font-size: 12px;
+}
+.director-status .ds-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+}
+.ds-dot.idle { background: var(--muted); }
+.ds-dot.thinking { background: var(--warning); animation: pulse 1s infinite; }
+.ds-dot.running { background: var(--info); animation: pulse .6s infinite; }
+.ds-dot.done { background: var(--success); }
+.ds-dot.error { background: var(--error); }
+
+/* ── 空状态 / 加载 / 错误 ────────────────── */
+.state-overlay {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 12px;
+  color: var(--text2); padding: 40px;
+}
+.state-overlay .icon { font-size: 48px; opacity: .5; }
+.state-overlay h3 { font-size: 16px; color: var(--text); }
+.state-overlay p { font-size: 12px; text-align: center; max-width: 320px; line-height: 1.6; }
+.state-overlay.error h3 { color: var(--error); }
+.state-overlay.loading .icon { animation: pulse 1.5s infinite; }
+
+/* ── 底部控制栏 ──────────────────────────── */
+.bottom-bar .btn { font-size: 11px; padding: 5px 10px; }
+.bottom-bar .btn-group { display: flex; gap: 0; }
+.bottom-bar .btn-group .btn { border-radius: 0; }
+.bottom-bar .btn-group .btn:first-child { border-radius: var(--radius) 0 0 var(--radius); }
+.bottom-bar .btn-group .btn:last-child { border-radius: 0 var(--radius) var(--radius) 0; }
+
+/* ── 提示横幅 ────────────────────────────── */
+.banner {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; border-radius: var(--radius);
+  font-size: 12px; animation: fadeIn .2s;
+  border: 1px solid transparent;
+}
+.banner.warning { background: rgba(255,152,0,.15); border-color: var(--warning); color: var(--warning); }
+.banner.error   { background: rgba(244,67,54,.15);  border-color: var(--error);   color: var(--error); }
+.banner.info    { background: rgba(33,150,243,.15);  border-color: var(--info);    color: var(--info); }
+.banner .banner-close {
+  margin-left: auto; cursor: pointer; font-size: 16px; opacity: .7;
+  background: none; border: none; color: inherit; padding: 0 4px;
+}
+.banner .banner-close:hover { opacity: 1; }
+
+/* ── 响应式 ──────────────────────────────── */
+@media (max-width: 700px) {
+  .main { flex-direction: column; }
+  .left-panel { width: 100%; max-height: 180px; border-right: none; border-bottom: 1px solid var(--border); }
+  .right-panel { width: 100%; max-height: 250px; border-left: none; border-top: 1px solid var(--border); }
+}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════
+   1) 顶部状态栏
+   ═══════════════════════════════════════════════════════ -->
+<div class="topbar" id="topbar">
+  <span class="brand">🎬 导演台</span>
+  <span class="status-dot off" id="connDot" title="连接状态"></span>
+  <span style="font-size:11px;color:var(--text2)" id="connLabel">未连接</span>
+  <span class="sep"></span>
+
+  <div class="mode-switch" id="modeSwitch">
+    <button data-mode="live" class="active">🔗 实时</button>
+    <button data-mode="import">📁 导入</button>
+  </div>
+
+  <span class="sep"></span>
+  <span style="font-size:10px;color:var(--muted)" id="modelLabel"></span>
+  <span class="spacer"></span>
+
+  <button class="btn" id="btnRefresh" onclick="actions.refresh()">🔄 刷新</button>
+  <button class="btn primary" id="btnDirectorRun" onclick="actions.directorRun()">🎯 导演决定</button>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+   主体：三栏布局
+   ═══════════════════════════════════════════════════════ -->
+<div class="main">
+
+  <!-- ═══ 2) 左侧：角色区 ═══════════════════════════════ -->
+  <div class="left-panel" id="leftPanel">
+    <div class="panel-title">
+      👥 角色 <span style="font-size:10px;color:var(--muted)" id="roleCount">0</span>
+    </div>
+    <div class="role-list" id="roleList">
+      <div class="state-overlay"><div class="icon">🎭</div><p>等待加载...</p></div>
+    </div>
+  </div>
+
+  <!-- ═══ 3) 中间：聊天区 ═══════════════════════════════ -->
+  <div class="center-panel" id="centerPanel">
+    <div class="chat-header">
+      <span>💬 对话流</span>
+      <span style="color:var(--muted)">消息: <b id="msgCountHeader">0</b></span>
+      <span style="color:var(--muted)">轮次: <b id="turnCountHeader">0</b></span>
+    </div>
+    <div class="chat-messages" id="chatMessages">
+      <div class="state-overlay"><div class="icon">💬</div><h3>暂无消息</h3><p>连接酒馆或导入聊天记录开始</p></div>
+    </div>
+    <div id="typingRow" style="display:none; padding:4px 14px;">
+      <div class="typing-indicator">导演调度中<span class="dot">.</span><span class="dot">.</span><span class="dot">.</span></div>
+    </div>
+    <!-- 错误/提示横幅 -->
+    <div id="bannerRow" style="display:none; padding:0 14px;">
+      <div id="bannerBox" class="banner"></div>
+    </div>
+  </div>
+
+  <!-- ═══ 4) 右侧：数据预览区 ═══════════════════════════ -->
+  <div class="right-panel" id="rightPanel">
+
+    <!-- A. 会话数据 -->
+    <div class="panel-section">
+      <div class="section-header" onclick="ui.togglePanel('session')">
+        📋 会话数据 <span class="arrow open" id="arrow_session">▶</span>
+      </div>
+      <div class="section-body" id="body_session">
+        <div class="kv-row"><span class="kv-key">会话ID</span><span class="kv-val" id="kv_sessionId">—</span></div>
+        <div class="kv-row"><span class="kv-key">模式</span><span class="kv-val" id="kv_mode">—</span></div>
+        <div class="kv-row"><span class="kv-key">角色数</span><span class="kv-val" id="kv_chars">0</span></div>
+        <div class="kv-row"><span class="kv-key">消息数</span><span class="kv-val" id="kv_msgs">0</span></div>
+        <div class="kv-row"><span class="kv-key">世界书</span><span class="kv-val" id="kv_wb">0</span></div>
+      </div>
+    </div>
+
+    <!-- B. 世界书预览 -->
+    <div class="panel-section">
+      <div class="section-header" onclick="ui.togglePanel('worldbook')">
+        📖 世界书 <span class="arrow open" id="arrow_worldbook">▶</span>
+      </div>
+      <div class="section-body" id="body_worldbook">
+        <div style="color:var(--muted);font-size:11px;padding:8px 0">等待数据...</div>
+      </div>
+    </div>
+
+    <!-- C. 破限预览 -->
+    <div class="panel-section">
+      <div class="section-header" onclick="ui.togglePanel('jailbreak')">
+        🔓 破限 <span class="arrow" id="arrow_jailbreak">▶</span>
+      </div>
+      <div class="section-body collapsed" id="body_jailbreak">
+        <div style="color:var(--muted);font-size:11px;padding:4px 0">等待数据...</div>
+      </div>
+    </div>
+
+    <!-- D. 导演决策日志 -->
+    <div class="panel-section">
+      <div class="section-header" onclick="ui.togglePanel('directorLog')">
+        🎯 导演日志 <span class="arrow open" id="arrow_directorLog">▶</span>
+      </div>
+      <div class="section-body" id="body_directorLog">
+        <div style="color:var(--muted);font-size:11px;padding:4px 0">尚未执行调度</div>
+      </div>
+    </div>
+
+    <!-- E. 导演状态 -->
+    <div class="panel-section">
+      <div class="section-body" style="padding:8px 14px;">
+        <div class="director-status">
+          <span class="ds-dot idle" id="dsDot"></span>
+          <span id="dsLabel">待命</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+   5) 底部控制栏
+   ═══════════════════════════════════════════════════════ -->
+<div class="bottom-bar" id="bottomBar">
+  <button class="btn primary" onclick="actions.directorRun()" id="btnDirRun2">🎯 导演决定</button>
+  <button class="btn" onclick="actions.specifyRole()">👤 指定说话</button>
+  <button class="btn" onclick="actions.allNarrate()">📢 全员旁白</button>
+  <button class="btn" onclick="actions.allRoundRobin()">🔄 全员轮流</button>
+  <span class="sep" style="width:1px;height:20px;background:var(--border);margin:0 4px;"></span>
+  <button class="btn" onclick="actions.regenerate()">🔁 重新生成</button>
+  <button class="btn warn" onclick="actions.stopDirector()">⏹ 暂停</button>
+  <button class="btn" onclick="actions.clearCache()">🗑 清空</button>
+  <span class="spacer" style="flex:1;"></span>
+  <button class="btn" onclick="actions.manualRefresh()">📡 手动刷新酒馆</button>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+   JS: UI 控制器
+   ═══════════════════════════════════════════════════════ -->
+<script>
+(function(){
+'use strict';
+
+// ─── 状态 ──────────────────────────────────────────────
+const state = {
+  mode: 'live',
+  connected: false,
+  directorStatus: 'idle', // idle|thinking|running|done|error
+  panels: { session:true, worldbook:true, jailbreak:false, directorLog:true },
+  characters: [],
+  messages: [],
+  worldBooks: [],
+  jailbreak: { text:'', source:'none', enabled:false, name:'' },
+  directorLogs: [],
+  lastDecision: null,
+};
+
+// ─── DOM 引用缓存 ──────────────────────────────────────
+const $ = (id) => document.getElementById(id);
+
+// ═══════════════════════════════════════════════════════
+// 数据获取层（连接模块一和模块二）
+// ═══════════════════════════════════════════════════════
+
+function getModule1() {
+  return (window.parent || window).TavernDirector || null;
+}
+
+function getModule2() {
+  // 导演模块已合并到 window.TavernDirector.director
+  const TD = getModule1();
+  if (!TD) return null;
+  // 返回导演子模块（或者 TD 本身作为降级，因为 TD 上也有 quickPlan/autoPlan）
+  return TD.director || TD;
+}
+
+function fetchFromTavern() {
+  const TD1 = getModule1();
+  if (!TD1) return false;
+
+  try {
+    const raw = TD1.getSnapshot();
+    if (!raw) return false;
+
+    // 映射角色
+    state.characters = (raw.characters || []).map(c => ({
+      id: c.id || '', name: c.name || '', displayName: c.displayName || c.name || '',
+      avatar: c.avatar || '', model: c.model || '',
+      status: c.status === 'disabled' ? 'disabled' : 'enabled',
+      isNarrator: !!c.isNarrator, isSelected: false, prompt: c.prompt || '', description: c.description || '',
+    }));
+
+    // 映射消息
+    state.messages = (raw.messages || []).map((m, i) => ({
+      id: m.id || `m_${i}`, role: m.role || 'system',
+      speaker: m.speaker || '', content: m.content || '',
+      turnIndex: m.turnIndex != null ? m.turnIndex : i,
+      isDirectorDecision: false,
+    }));
+
+    // 映射世界书
+    state.worldBooks = (raw.worldBooks || []).map(w => ({
+      id: w.id || '', title: w.title || '', keys: w.keys || [],
+      content: w.content || '', hit: false, hitReason: '',
+      enabled: w.enabled !== false, depth: w.depth || 0, priority: w.priority || 10,
+    }));
+
+    // 映射破限
+    const jb = raw.jailbreak || {};
+    state.jailbreak = {
+      text: jb.text || '', source: jb.source || 'none',
+      enabled: !!jb.enabled, name: jb.name || '',
+    };
+
+    // 同步 session 摘要（供 simulatePlan 等使用）
+    state.session = {
+      sessionId: raw.sessionId || '',
+      mode: raw.mode || 'live',
+      characterCount: (raw.characters || []).length,
+      messageCount: (raw.messages || []).length,
+      worldBookCount: (raw.worldBooks || []).length,
+      jailbreakLoaded: !!(jb.enabled && jb.text),
+      jailbreakName: jb.name || '',
+    };
+
+    state.connected = true;
+    return true;
+  } catch(e) {
+    console.error('[Shell] 读取数据失败:', e);
+    return false;
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// 动作处理
+// ═══════════════════════════════════════════════════════
+
+const actions = {
+  refresh() {
+    setDirectorStatus('thinking');
+    const ok = fetchFromTavern();
+    if (ok) {
+      setDirectorStatus('done');
+      setTimeout(() => setDirectorStatus('idle'), 1500);
+    } else {
+      setDirectorStatus('error');
+      setTimeout(() => setDirectorStatus('idle'), 2000);
+    }
+    renderAll();
+  },
+
+  directorRun() {
+    if (!state.connected && !tryReconnect()) { showBanner('请先连接酒馆或导入数据', 'warning'); return; }
+
+    setDirectorStatus('thinking');
+    showTyping(true);
+
+    const plan = runRealDirector({ maxRoles: 3 });
+    if (plan) {
+      applyDirectorPlan(plan);
+      setDirectorStatus('done');
+    } else {
+      setDirectorStatus('error');
+    }
+    showTyping(false);
+    setTimeout(() => setDirectorStatus('idle'), 2000);
+    renderAll();
+  },
+
+  specifyRole() {
+    const names = state.characters.filter(c => c.status === 'enabled').map(c => c.displayName);
+    if (!names.length) { showBanner('没有可用的角色', 'warning'); return; }
+    const choice = prompt('指定谁说话？\n可用角色：' + names.join('、'), names[0]);
+    if (choice) {
+      const target = state.characters.find(c =>
+        c.displayName === choice || c.name === choice
+      );
+      if (target) {
+        setDirectorStatus('thinking');
+        showTyping(true);
+        const plan = runRealDirector({ manualSpeakerId: target.id, maxRoles: 1 });
+        if (plan) {
+          applyDirectorPlan(plan);
+          setDirectorStatus('done');
+        } else {
+          setDirectorStatus('error');
+        }
+        showTyping(false);
+        setTimeout(() => setDirectorStatus('idle'), 2000);
+        renderAll();
+      }
+    }
+  },
+
+  allNarrate() {
+    const enabled = state.characters.filter(c => c.status === 'enabled');
+    if (!enabled.length) { showBanner('没有可用的角色', 'warning'); return; }
+    setDirectorStatus('thinking');
+    showTyping(true);
+    const plan = runRealDirector({
+      manualSpeakerIds: enabled.map(c => c.id),
+      maxRoles: enabled.length,
+    });
+    if (plan) {
+      applyDirectorPlan(plan);
+      setDirectorStatus('done');
+    } else {
+      setDirectorStatus('error');
+    }
+    showTyping(false);
+    setTimeout(() => setDirectorStatus('idle'), 2000);
+    renderAll();
+  },
+
+  allRoundRobin() {
+    const enabled = state.characters.filter(c => c.status === 'enabled');
+    if (!enabled.length) { showBanner('没有可用的角色', 'warning'); return; }
+    setDirectorStatus('thinking');
+    showTyping(true);
+    const plan = runRealDirector({
+      manualSpeakerIds: enabled.map(c => c.id),
+      maxRoles: enabled.length,
+      orderStrategy: 'round-robin',
+    });
+    if (plan) {
+      applyDirectorPlan(plan);
+      setDirectorStatus('done');
+    } else {
+      setDirectorStatus('error');
+    }
+    showTyping(false);
+    setTimeout(() => setDirectorStatus('idle'), 2000);
+    renderAll();
+  },
+
+  regenerate() { actions.directorRun(); },
+  stopDirector() { setDirectorStatus('idle'); showTyping(false); renderAll(); },
+  clearCache() {
+    state.directorLogs = [];
+    state.lastDecision = null;
+    state.characters.forEach(c => { c.isSelected = false; });
+    state.worldBooks.forEach(w => { w.hit = false; w.hitReason = ''; });
+    dismissBanner();
+    if (getModule1()) { try { getModule1().stopLiveMode(); } catch(e){} }
+    renderAll();
+  },
+  manualRefresh() { actions.refresh(); },
+
+  switchMode(mode) {
+    state.mode = mode;
+    document.querySelectorAll('.mode-switch button').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.mode === mode);
+    });
+    if (mode === 'live') {
+      actions.refresh();
+    }
+    renderAll();
+  },
+
+  toggleRole(roleId) {
+    const c = state.characters.find(c => c.id === roleId);
+    if (c) {
+      c.status = c.status === 'enabled' ? 'disabled' : 'enabled';
+      renderRoles();
+    }
+  },
+};
+
+// ─── 统一导演调度入口 ─────────────────────────────────
+function runRealDirector(opts) {
+  const TD2 = getModule2();
+  if (!TD2 || !TD2.autoPlan) {
+    // 最后降级：用简化评分模拟
+    return simulatePlan(opts);
+  }
+
+  try {
+    const plan = TD2.autoPlan(opts);
+    if (plan && plan.decision && plan.decision.selectedRoleIds && plan.decision.selectedRoleIds.length > 0) {
+      return plan;
+    }
+    // 导演返回空结果，走模拟
+    return simulatePlan(opts);
+  } catch (e) {
+    console.error('[Shell] 导演调度失败:', e);
+    return simulatePlan(opts);
+  }
+}
+
+// ─── 降级模拟调度（仅在 Director 模块完全不可用时） ──
+function simulatePlan(opts) {
+  const enabled = state.characters.filter(c => c.status === 'enabled');
+  const manualIds = opts.manualSpeakerIds || (opts.manualSpeakerId ? [opts.manualSpeakerId] : []);
+  const maxRoles = opts.maxRoles || 3;
+
+  // 手动指定优先，否则取前 N 个启用角色
+  const selected = manualIds.length
+    ? enabled.filter(c => manualIds.includes(c.id))
+    : enabled.slice(0, maxRoles);
+
+  // 排序：指定顺序优先，否则按列表顺序
+  const ordered = opts.orderStrategy === 'round-robin'
+    ? [...selected].sort((a, b) => a.id.localeCompare(b.id))
+    : manualIds.length
+      ? manualIds.filter(id => selected.some(s => s.id === id)).map(id => selected.find(s => s.id === id))
+      : selected;
+
+  const skipped = enabled.filter(c => !ordered.some(o => o.id === c.id));
+  const now = Date.now();
+
+  // 构造与 Director.planTurn 兼容的 plan 结构
+  const plan = {
+    request: { session: null, latestUserMessage: '', manualSpeakerIds: manualIds, maxRoles },
+    config: { mode: 'sequential', dialogueMode: 'sequential', maxRoles, maxWorldBooks: 6, recentMessages: 12, orderStrategy: opts.orderStrategy || 'score', allowParallel: false, includeNarrator: true, includeDisabled: false, preferSpeakerContinuity: true, topicThreshold: 1 },
+    decision: {
+      mode: 'sequential',
+      planId: 'sim_' + now,
+      sessionId: state.session.sessionId || '',
+      selectedRoleIds: selected.map(c => c.id),
+      orderedRoleIds: ordered.map(c => c.id),
+      skippedRoleIds: skipped.map(c => c.id),
+      roleScores: selected.map(c => ({ roleId: c.id, score: 100, reasons: ['manual'], priority: 'high' })),
+      worldBookScores: [],
+      selectedWorldBookIds: [],
+      reason: '降级模式：' + (manualIds.length ? `指定 ${selected.map(c => c.displayName).join('、')}` : `选择 ${selected.map(c => c.displayName).join('、')}`),
+      timestamp: now,
+    },
+    contexts: {},
+    payloads: selected.map((c, i) => ({
+      roleId: c.id, roleName: c.displayName, model: c.model || '', status: 'queued', orderIndex: i,
+      context: { role: c, visibleMessages: state.messages.slice(-12), selectedWorldBooks: [], publicSummary: '', directorNote: '降级模式调度', wakeReason: ['manual'], priority: 'high' },
+      prompt: '',
+    })),
+    promptBundle: { directorPrompt: '', rolePrompts: {} },
+  };
+
+  // 插入导演消息
+  state.messages.push({
+    id: 'dir_' + now,
+    role: 'system',
+    speaker: '🎬 导演',
+    content: '📋 ' + plan.decision.reason,
+    turnIndex: state.messages.length,
+    isDirectorDecision: true,
+  });
+
+  return plan;
+}
+
+function applyDirectorPlan(plan) {
+  const dec = plan.decision || {};
+  const selectedSet = new Set(dec.selectedRoleIds || []);
+  const wbSet = new Set(dec.selectedWorldBookIds || []);
+
+  state.characters.forEach(c => { c.isSelected = selectedSet.has(c.id); });
+  state.worldBooks.forEach(w => {
+    w.hit = wbSet.has(w.id);
+    w.hitReason = wbSet.has(w.id) ? '导演选中' : '';
+  });
+
+  state.lastDecision = {
+    id: dec.planId || '',
+    timestamp: dec.timestamp || Date.now(),
+    planId: dec.planId || '',
+    mode: dec.mode || 'sequential',
+    selectedRoles: dec.selectedRoleIds || [],
+    orderedRoles: dec.orderedRoleIds || [],
+    skippedRoles: dec.skippedRoleIds || [],
+    reason: dec.reason || '',
+    worldBookCount: (dec.selectedWorldBookIds || []).length,
+    duration: 0,
+  };
+  state.directorLogs.unshift(state.lastDecision);
+  if (state.directorLogs.length > 50) state.directorLogs.length = 50;
+}
+
+// ═══════════════════════════════════════════════════════
+// 渲染
+// ═══════════════════════════════════════════════════════
+
+function renderAll() {
+  renderTopbar();
+  renderRoles();
+  renderMessages();
+  renderRightPanel();
+}
+
+function renderTopbar() {
+  const dot = $('connDot');
+  const label = $('connLabel');
+  dot.className = 'status-dot ' + (state.connected ? 'on' : 'off');
+  label.textContent = state.connected ? '已连接' : '未连接';
+  $('modelLabel').textContent = state.mode === 'live' ? '实时模式' : '导入模式';
+
+  const dsDot = $('dsDot');
+  const dsLabel = $('dsLabel');
+  dsDot.className = 'ds-dot ' + state.directorStatus;
+  dsLabel.textContent =
+    state.directorStatus === 'idle' ? '待命' :
+    state.directorStatus === 'thinking' ? '思考中...' :
+    state.directorStatus === 'running' ? '执行中...' :
+    state.directorStatus === 'done' ? '已完成' : '错误';
+}
+
+function renderRoles() {
+  const container = $('roleList');
+  $('roleCount').textContent = state.characters.length;
+
+  if (!state.characters.length) {
+    container.innerHTML = '<div class="state-overlay"><p>无角色数据</p></div>';
+    return;
+  }
+
+  container.innerHTML = state.characters.map(c => `
+    <div class="role-card ${c.isSelected ? 'selected' : ''} ${c.status === 'disabled' ? 'disabled' : ''}"
+         onclick="actions.toggleRole('${esc(c.id)}')" title="点击切换启用/禁用">
+      <div class="rc-avatar">${c.avatar ? '<img src="'+esc(c.avatar)+'" onerror="this.style.display=\'none\'">' : '👤'}</div>
+      <div class="rc-info">
+        <div class="rc-name">${esc(c.displayName)}</div>
+        <div class="rc-model">${esc(c.model || '默认')}</div>
+      </div>
+      ${c.isNarrator ? '<span class="rc-badge narrator">旁白</span>' : ''}
+      ${c.isSelected ? '<span class="rc-badge">选中</span>' : ''}
+      <span style="font-size:10px;color:${c.status==='enabled'?'var(--success)':'var(--error)'}">
+        ${c.status === 'enabled' ? '●' : '○'}
+      </span>
+    </div>
+  `).join('');
+}
+
+function renderMessages() {
+  const container = $('chatMessages');
+  const msgs = state.messages;
+  $('msgCountHeader').textContent = msgs.length;
+  $('turnCountHeader').textContent = msgs.length ? msgs[msgs.length-1].turnIndex + 1 : 0;
+
+  if (!msgs.length) {
+    container.innerHTML = '<div class="state-overlay"><div class="icon">💬</div><h3>暂无消息</h3><p>连接酒馆或点击「导演决定」开始</p></div>';
+    return;
+  }
+
+  // 只渲染最后 50 条
+  const recent = msgs.slice(-50);
+  let lastTurn = -1;
+  const html = recent.map(m => {
+    let turnSep = '';
+    if (m.turnIndex > lastTurn && m.turnIndex > 0 && lastTurn >= 0) {
+      turnSep = `<div class="turn-sep">—— 第 ${m.turnIndex} 轮 ——</div>`;
+    }
+    lastTurn = m.turnIndex;
+
+    const cls = m.isDirectorDecision ? 'director' : m.role;
+    const speakerLabel = m.role === 'user' ? 'user' : m.role === 'character' ? '' : 'director';
+    const speakerHtml = m.speaker && m.role !== 'user'
+      ? `<div class="msg-speaker ${speakerLabel}">${esc(m.speaker)}</div>` : '';
+
+    return turnSep + `
+      <div class="msg-bubble ${cls}">
+        ${speakerHtml}
+        <div>${esc(m.content).substring(0, 200)}</div>
+      </div>`;
+  }).join('');
+
+  container.innerHTML = html;
+  container.scrollTop = container.scrollHeight;
+}
+
+function renderRightPanel() {
+  // 会话数据
+  $('kv_sessionId').textContent = '...';
+  $('kv_mode').textContent = state.mode === 'live' ? '实时' : '导入';
+  $('kv_chars').textContent = state.characters.length;
+  $('kv_msgs').textContent = state.messages.length;
+  $('kv_wb').textContent = state.worldBooks.length;
+
+  // 世界书
+  const wbBody = $('body_worldbook');
+  if (!state.worldBooks.length) {
+    wbBody.innerHTML = '<div style="color:var(--muted);font-size:11px;padding:6px 0">无世界书条目</div>';
+  } else {
+    wbBody.innerHTML = state.worldBooks.slice(0, 10).map(w => `
+      <div class="wb-item">
+        <div class="wb-title">
+          ${esc(w.title || '未命名')}
+          ${w.hit ? '<span class="wb-hit yes">命中</span>' : '<span class="wb-hit no">—</span>'}
+          ${!w.enabled ? '<span style="color:var(--error);font-size:9px">禁用</span>' : ''}
+        </div>
+        <div class="wb-keys">${w.keys.slice(0,3).map(esc).join(', ') || '无触发词'}</div>
+        ${w.hit && w.hitReason ? `<div style="font-size:10px;color:var(--success)">${esc(w.hitReason)}</div>` : ''}
+      </div>
+    `).join('');
+  }
+
+  // 破限
+  const jbBody = $('body_jailbreak');
+  const jb = state.jailbreak;
+  jbBody.innerHTML = jb.text
+    ? `<div style="font-size:11px;max-height:120px;overflow-y:auto;white-space:pre-wrap;color:var(--text2);background:var(--bg);padding:8px;border-radius:4px;">${esc(jb.text).substring(0, 300)}</div>
+       <div class="kv-row" style="margin-top:4px"><span class="kv-key">来源</span><span class="kv-val">${esc(jb.source)}</span></div>
+       <div class="kv-row"><span class="kv-key">状态</span><span class="kv-val">${jb.enabled ? '✅ 启用' : '⛔ 未启用'}</span></div>`
+    : '<div style="color:var(--muted);font-size:11px;padding:4px 0">未加载破限</div>';
+
+  // 导演日志
+  const logBody = $('body_directorLog');
+  if (!state.directorLogs.length) {
+    logBody.innerHTML = '<div style="color:var(--muted);font-size:11px;padding:4px 0">尚未执行调度</div>';
+  } else {
+    logBody.innerHTML = state.directorLogs.slice(0, 10).map(log => `
+      <div class="log-item">
+        <div class="log-time">${new Date(log.timestamp).toLocaleTimeString()} · ${esc(log.mode)} · ${log.duration || 0}ms</div>
+        <div class="log-roles">🎯 ${log.selectedRoles.length ? state.characters.filter(c => log.selectedRoles.includes(c.id)).map(c=>c.displayName).join('、') : '无'} ${log.orderedRoles.length > 1 ? '→ 顺序: ' + log.orderedRoles.map(id => state.characters.find(c=>c.id===id)?.displayName || id).join(' → ') : ''}</div>
+        ${log.skippedRoles.length ? `<div style="font-size:10px;color:var(--muted)">⏭ 跳过: ${log.skippedRoles.map(id => state.characters.find(c=>c.id===id)?.displayName || id).join('、')}</div>` : ''}
+        <div class="log-reason">${esc(log.reason)}</div>
+      </div>
+    `).join('');
+  }
+}
+
+function showTyping(show) {
+  $('typingRow').style.display = show ? 'block' : 'none';
+}
+
+function setDirectorStatus(s) {
+  state.directorStatus = s;
+  renderTopbar();
+}
+
+// ─── 横幅提示 ──────────────────────────────
+let bannerTimer = null;
+function showBanner(msg, type) {
+  type = type || 'warning';
+  var row = $('bannerRow');
+  var box = $('bannerBox');
+  box.className = 'banner ' + type;
+  box.innerHTML = '<span>' + esc(msg) + '</span><button class="banner-close" onclick="dismissBanner()">&times;</button>';
+  row.style.display = 'block';
+  if (bannerTimer) clearTimeout(bannerTimer);
+  if (type !== 'error') bannerTimer = setTimeout(dismissBanner, 5000);
+}
+function dismissBanner() {
+  $('bannerRow').style.display = 'none';
+  if (bannerTimer) { clearTimeout(bannerTimer); bannerTimer = null; }
+}
+function tryReconnect() {
+  var ok = fetchFromTavern();
+  if (!ok && getModule1()) {
+    try { getModule1().startLiveMode(function(){ fetchFromTavern(); renderAll(); }, 2000); } catch(e){}
+    state.connected = true; // 乐观假设
+  }
+  if (!state.connected) showBanner('无法连接酒馆，请确认插件已正确加载', 'error');
+  return state.connected;
+}
+
+// ═══════════════════════════════════════════════════════
+// UI 交互辅助
+// ═══════════════════════════════════════════════════════
+
+const ui = {
+  togglePanel(key) {
+    state.panels[key] = !state.panels[key];
+    const body = $('body_' + key);
+    const arrow = $('arrow_' + key);
+    if (body) body.classList.toggle('collapsed', !state.panels[key]);
+    if (arrow) arrow.classList.toggle('open', state.panels[key]);
+  },
+};
+
+// 暴露给 HTML onclick
+window.actions = actions;
+window.ui = ui;
+
+// ═══════════════════════════════════════════════════════
+// 初始化
+// ═══════════════════════════════════════════════════════
+
+function init() {
+  // 模式切换按钮
+  $('modeSwitch').addEventListener('click', function(e) {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    actions.switchMode(btn.dataset.mode);
+  });
+
+  // 初始加载
+  setTimeout(() => {
+    const ok = fetchFromTavern();
+    if (!ok) {
+      state.connected = false;
+      // 尝试启动实时监听
+      const TD1 = getModule1();
+      if (TD1 && TD1.startLiveMode) {
+        TD1.startLiveMode(function() {
+          fetchFromTavern();
+          renderAll();
+        }, 2000);
+      }
+    }
+    renderAll();
+  }, 800);
+
+  console.log('[DirectorShell] UI 壳子 v0.3.0 已就绪');
+  console.log('[DirectorShell] 模式:', state.mode, '| 连接:', state.connected);
+}
+
+function esc(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+document.addEventListener('DOMContentLoaded', init);
+
+})();
+</script>
+</body>
+</html>
