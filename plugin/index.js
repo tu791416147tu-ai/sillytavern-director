@@ -3451,10 +3451,10 @@
         css.id = 'td-floating-style';
         css.textContent = `
 #td-floating-root{position:fixed;z-index:2147483640;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans SC",sans-serif;font-size:12px;line-height:1.5;color:#e0e0e0}
-#td-fab{position:fixed;right:16px;bottom:16px;z-index:2147483641;width:48px;height:48px;border-radius:50%;background:#1a1a2e;color:#fff;border:2px solid rgba(233,69,96,.35);cursor:pointer;font-size:16px;box-shadow:0 4px 20px rgba(0,0,0,.45);transition:.2s;display:flex;align-items:center;justify-content:center;padding:0;overflow:hidden;animation:td-fab-pulse 2s ease-in-out infinite}
+#td-fab{position:fixed;right:20px;bottom:20px;z-index:2147483641;width:52px;height:52px;border-radius:50%;background:rgba(22,33,62,.9);color:#fff;border:3px solid #e94560;cursor:pointer;font-size:16px;box-shadow:0 0 0 3px rgba(255,255,255,.25),0 0 24px rgba(233,69,96,.7),0 0 48px rgba(233,69,96,.3);transition:.2s;display:flex;align-items:center;justify-content:center;padding:0;overflow:hidden;animation:td-fab-pulse 3s ease-in-out infinite}
 #td-fab img{width:100%;height:100%;object-fit:cover;border-radius:50%}
-#td-fab:hover{transform:scale(1.1);border-color:#e94560;box-shadow:0 6px 28px rgba(233,69,96,.5)}
-@keyframes td-fab-pulse{0%,100%{box-shadow:0 4px 20px rgba(0,0,0,.45)}50%{box-shadow:0 4px 28px rgba(233,69,96,.55)}}
+#td-fab:hover{transform:scale(1.12);border-color:#ff6b81;box-shadow:0 0 0 4px rgba(255,255,255,.4),0 0 32px rgba(233,69,96,.85),0 0 56px rgba(233,69,96,.45)}
+@keyframes td-fab-pulse{0%,100%{box-shadow:0 0 0 3px rgba(255,255,255,.25),0 0 24px rgba(233,69,96,.7),0 0 48px rgba(233,69,96,.3)}50%{box-shadow:0 0 0 5px rgba(255,255,255,.45),0 0 36px rgba(233,69,96,.9),0 0 60px rgba(233,69,96,.5)}}
 #td-fab.hidden{display:none}
 #td-panel{position:fixed;right:16px;bottom:72px;z-index:2147483640;width:340px;max-height:78vh;background:#1a1a2e;border:1px solid #2a2a4a;border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,.5);overflow:hidden;display:flex;flex-direction:column;transition:.2s;resize:both}
 #td-panel.collapsed{max-height:40px;resize:none}
@@ -3513,7 +3513,7 @@
 .td-bind-row button.del:hover{background:#f44336}
 /* Mobile: full-width panel, larger touch targets */
 @media (max-width: 480px) {
-  #td-fab{right:8px;bottom:8px;width:56px;height:56px;border-radius:50%}
+  #td-fab{right:12px;bottom:12px;width:60px;height:60px;border-radius:50%}
   #td-panel{right:4px;bottom:64px;width:calc(100vw - 8px);max-height:60vh;border-radius:8px;font-size:13px;resize:none}
   #td-panel.collapsed{max-height:44px}
   #td-header{padding:12px;font-size:14px}
