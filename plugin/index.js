@@ -3507,6 +3507,18 @@
 .td-bind-row button{padding:2px 8px;border-radius:3px;background:#2a2a4a;color:#e0e0e0;border:none;cursor:pointer;font-size:10px}
 .td-bind-row button:hover{background:#e94560}
 .td-bind-row button.del:hover{background:#f44336}
+/* Mobile: full-width panel, larger touch targets */
+@media (max-width: 480px) {
+  #td-fab{right:8px;bottom:8px;width:48px;height:48px;font-size:22px}
+  #td-panel{right:4px;bottom:64px;width:calc(100vw - 8px);max-height:60vh;border-radius:8px;font-size:13px;resize:none}
+  #td-panel.collapsed{max-height:44px}
+  #td-header{padding:12px;font-size:14px}
+  .td-act{padding:8px 10px;font-size:11px;min-width:60px}
+  .td-tab{font-size:12px;padding:10px}
+  #td-body{padding:8px 10px}
+  .td-field input,.td-field select,.td-field textarea{font-size:13px;padding:8px}
+  .td-bind-row{font-size:11px}
+}
 `.trim();
         document.head.appendChild(css);
         console.log('[TavernDirector] CSS 已注入');
@@ -3563,31 +3575,40 @@
         function showPanel() { $panel.style.display = 'flex'; $fab.classList.add('hidden'); expand(); }
         document.getElementById('td-btn-close').addEventListener('click', hidePanel);
         $fab.addEventListener('click', showPanel);
-        // ── Draggable header ───────────────────────────
+        // ── Draggable header (mouse + touch) ──────────
         let dragging = false, offX = 0, offY = 0;
-        document.getElementById('td-header').addEventListener('mousedown', (e) => {
+        const headerEl = document.getElementById('td-header');
+        function dragStart(e) {
             if (e.target.tagName === 'BUTTON')
                 return;
             dragging = true;
             const r = $panel.getBoundingClientRect();
-            offX = e.clientX - r.left;
-            offY = e.clientY - r.top;
+            const p = 'touches' in e ? e.touches[0] : e;
+            offX = p.clientX - r.left;
+            offY = p.clientY - r.top;
             $panel.style.transition = 'none';
-        });
-        document.addEventListener('mousemove', (e) => {
+        }
+        function dragMove(e) {
             if (!dragging)
                 return;
+            const p = 'touches' in e ? e.touches[0] : e;
             $panel.style.right = 'auto';
             $panel.style.bottom = 'auto';
-            $panel.style.left = (e.clientX - offX) + 'px';
-            $panel.style.top = (e.clientY - offY) + 'px';
-        });
-        document.addEventListener('mouseup', () => {
+            $panel.style.left = (p.clientX - offX) + 'px';
+            $panel.style.top = (p.clientY - offY) + 'px';
+        }
+        function dragEnd() {
             if (dragging) {
                 dragging = false;
                 $panel.style.transition = '.2s';
             }
-        });
+        }
+        headerEl.addEventListener('mousedown', dragStart);
+        headerEl.addEventListener('touchstart', dragStart, { passive: false });
+        document.addEventListener('mousemove', dragMove);
+        document.addEventListener('touchmove', dragMove, { passive: false });
+        document.addEventListener('mouseup', dragEnd);
+        document.addEventListener('touchend', dragEnd);
         // ── Tab switching ─────────────────────────────
         $tabs.forEach(t => t.addEventListener('click', () => {
             S.currentTab = t.dataset.tab;
