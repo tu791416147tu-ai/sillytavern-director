@@ -3649,7 +3649,7 @@
     function doFullAuto() { var TD=getTD();showBanner("⏳ 全自动执行中...","warn");try{var p=TD.fullAuto?TD.fullAuto():null;if(p&&p.then){p.then(function(r){S.logs.unshift({timestamp:Date.now(),selectedRoles:(r.plan&&r.plan.decision&&r.plan.decision.selectedRoleIds)||[],orderedRoles:[],reason:"全自动完成"});if(S.logs.length>50)S.logs.length=50;showBanner("✅ 完成: "+(r.report&&r.report.successCount||0)+" 成功","ok");syncData();render()}).catch(function(e){showBanner("全自动失败: "+String(e),"err");syncData();render()})}}catch(e){showBanner("全自动失败: "+String(e),"err")} }
 
     // ── 事件 ──
-    fab.addEventListener("click", function(e) { if (fab._wasDragged) { fab._wasDragged = false; return; } panel.classList.contains("show") ? closePanel() : openPanel(); });
+    fab.addEventListener("click", function(e) { if (fab._wasDragged) { fab._wasDragged = false; console.log("[TD] click ignored (was dragged)"); return; } console.log("[TD] FAB clicked, panel visible:", panel.classList.contains("show")); panel.classList.contains("show") ? closePanel() : openPanel(); });
     document.getElementById("td-btn-close").addEventListener("click", function(e) { e.stopPropagation(); closePanel(); });
     $btnMin.addEventListener("click", function() { S.collapsed ? expandP() : collapse(); });
     if ($tabs.length >= 2) {
@@ -3659,17 +3659,17 @@
 
     // ── FAB 拖拽 ──
     var dragging = false, sx, sy, sl, st;
-    function ds(e) { dragging=true; fab._wasDragged=false; fab.classList.add("dragging"); var p=e.touches?e.touches[0]:e; sx=p.clientX; sy=p.clientY; sl=fab.offsetLeft; st=fab.offsetTop; e.preventDefault(); }
-    function dm(e) { if(!dragging)return; var p=e.touches?e.touches[0]:e; var dx=p.clientX-sx, dy=p.clientY-sy; if(Math.abs(dx)>3||Math.abs(dy)>3)fab._wasDragged=true; var nx=sl+dx, ny=st+dy; nx=Math.max(0,Math.min(nx,window.innerWidth-fab.offsetWidth)); ny=Math.max(0,Math.min(ny,window.innerHeight-fab.offsetHeight)); fab.style.left=nx+"px"; fab.style.top=ny+"px"; if(panel.classList.contains("show"))panelPos(); }
+    function ds(e) { dragging=true; fab._wasDragged=false; fab.classList.add("dragging"); var p=e.touches?e.touches[0]:e; sx=p.clientX; sy=p.clientY; sl=fab.offsetLeft; st=fab.offsetTop; /* 不在这里preventDefault,否则移动端click被吞 */ }
+    function dm(e) { if(!dragging)return; var p=e.touches?e.touches[0]:e; var dx=p.clientX-sx, dy=p.clientY-sy; if(Math.abs(dx)>3||Math.abs(dy)>3){fab._wasDragged=true; if(e.cancelable)e.preventDefault();} var nx=sl+dx, ny=st+dy; nx=Math.max(0,Math.min(nx,window.innerWidth-fab.offsetWidth)); ny=Math.max(0,Math.min(ny,window.innerHeight-fab.offsetHeight)); fab.style.left=nx+"px"; fab.style.top=ny+"px"; if(panel.classList.contains("show"))panelPos(); }
     function de() { if(!dragging)return; dragging=false; fab.classList.remove("dragging"); try{localStorage.setItem("td-fab-pos",JSON.stringify({x:fab.offsetLeft,y:fab.offsetTop}))}catch(e){} }
-    fab.addEventListener("touchstart", ds, {passive:false}); fab.addEventListener("mousedown", ds);
+    fab.addEventListener("touchstart", ds, {passive:true}); fab.addEventListener("mousedown", ds);
     document.addEventListener("touchmove", dm, {passive:false}); document.addEventListener("mousemove", dm);
     document.addEventListener("touchend", de); document.addEventListener("mouseup", de);
 
     // ── 面板拖拽 ──
     var pd=false, pdx,pdy;
     var hdr = document.getElementById("td-header");
-    hdr.addEventListener("touchstart", function(e) { if(e.target.tagName==="BUTTON")return; pd=true; var p=e.touches[0]; pdx=p.clientX-panel.offsetLeft; pdy=p.clientY-panel.offsetTop; e.preventDefault(); }, {passive:false});
+    hdr.addEventListener("touchstart", function(e) { if(e.target.tagName==="BUTTON")return; pd=true; var p=e.touches[0]; pdx=p.clientX-panel.offsetLeft; pdy=p.clientY-panel.offsetTop; }, {passive:true});
     hdr.addEventListener("mousedown", function(e) { if(e.target.tagName==="BUTTON")return; pd=true; pdx=e.clientX-panel.offsetLeft; pdy=e.clientY-panel.offsetTop; });
     document.addEventListener("touchmove", function(e) { if(!pd)return; var p=e.touches[0]; panel.style.left=(p.clientX-pdx)+"px"; panel.style.top=(p.clientY-pdy)+"px"; });
     document.addEventListener("mousemove", function(e) { if(!pd)return; panel.style.left=(e.clientX-pdx)+"px"; panel.style.top=(e.clientY-pdy)+"px"; });
