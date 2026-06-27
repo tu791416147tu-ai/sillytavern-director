@@ -3487,7 +3487,7 @@
     ".td-bind-row{display:flex;align-items:center;gap:6px;padding:4px 0;font-size:10px}"+
     ".td-bind-row select{flex:1;padding:4px;background:#0f0f1a;border:1px solid #2a2a4a;border-radius:3px;color:#e0e0e0;font-size:10px}"+
     ".td-bind-row button{padding:2px 8px;border-radius:3px;background:#2a2a4a;color:#e0e0e0;border:none;cursor:pointer;font-size:10px}"+
-    "@media(max-width:480px){#td-fab{width:52px;height:52px}#td-panel{width:calc(100vw - 8px);max-height:55vh;border-radius:8px;font-size:13px}}";
+    "@media(max-width:480px){#td-fab{width:38px;height:38px}#td-panel{width:calc(100vw - 8px);max-height:55vh;border-radius:8px;font-size:13px}}";
     document.head.appendChild(style);
 
     // ── 图片 ──
