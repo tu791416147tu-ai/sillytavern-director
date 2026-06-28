@@ -1806,7 +1806,7 @@
             const sorted = selected.map((s) => s.roleId).sort((a, b) => a.localeCompare(b));
             // 用排序后的角色列表作为 key（同一组角色共享旋转状态）
             const key = sorted.join(',');
-            const lastIdx = roundRobinState.get(key) || -1;
+            const lastIdx = roundRobinState.get(key) ?? -1;
             const start = (lastIdx + 1) % sorted.length;
             // 旋转后的顺序：start...end, 0...start-1
             const rotated = sorted.slice(start).concat(sorted.slice(0, start));
@@ -3661,9 +3661,11 @@
   }
   function loadPrefs() {
     try {
-      const tab = localStorage.getItem('td-panel-tab');
+      var tab = localStorage.getItem('td-panel-tab');
       if (tab === 'console' || tab === 'data' || tab === 'settings') S.currentTab = tab;
-    } catch { /* ignore */ }
+      var collapsed = localStorage.getItem('td-panel-collapsed');
+      if (collapsed === 'true') { S.collapsed = true; }
+    } catch (e) { /* ignore */ }
   }
   loadPrefs();
 
@@ -3687,6 +3689,19 @@
       console.warn('[TavernDirector] 面板展开失败，回退到FAB模式', e);
       $fab.classList.remove('hidden');
     }
+  }
+
+  function loadFabPos() {
+    try {
+      var saved = localStorage.getItem('td-fab-pos');
+      if (saved) {
+        var pos = JSON.parse(saved);
+        if (typeof pos.left === 'number' && typeof pos.top === 'number') {
+          $fab.style.left = pos.left + 'px';
+          $fab.style.top = pos.top + 'px';
+        }
+      }
+    } catch (e) { /* ignore */ }
   }
   function saveFabPos() {
     try {
@@ -3727,6 +3742,7 @@
     $fab.style.transition = '.2s';
     saveFabPos();
   }
+var fabMoved = false;  $fab.addEventListener('click', function(e) {    if (fabMoved) { fabMoved = false; return; }    showPanel();  });
   $fab.addEventListener('mousedown', fabDragStart);
   $fab.addEventListener('touchstart', fabDragStart, { passive: false });
   document.addEventListener('mousemove', fabDragMove);
@@ -4110,11 +4126,14 @@
       }));
 
       // Worldbooks with more detail
+      var oldWbMap = {};
+      S.worldBooks.forEach(function(w) { oldWbMap[w.id] = { hit: w.hit, hitReason: w.hitReason }; });
       S.worldBooks = (snap.worldBooks || []).map((w) => ({
         id: w.id || '', title: w.title || '',
         keys: w.keys || [], content: w.content || '',
         enabled: w.enabled !== false,
-        hit: false, hitReason: '',
+        hit: oldWbMap[w.id] ? oldWbMap[w.id].hit : false,
+        hitReason: oldWbMap[w.id] ? oldWbMap[w.id].hitReason : '',
       }));
 
       // Jailbreak
@@ -4261,6 +4280,28 @@
   // ═══════════════════════════════════════════════════
   syncData();
   hidePanel();
+  
+  // ── 清理函数（供 onUnload 调用）──
+  function cleanupFloatingPanel() {
+    try {
+      document.removeEventListener('mousemove', fabDragMove);
+      document.removeEventListener('touchmove', fabDragMove);
+      document.removeEventListener('mouseup', fabDragEnd);
+      document.removeEventListener('touchend', fabDragEnd);
+      document.removeEventListener('mousemove', dragMove);
+      document.removeEventListener('touchmove', dragMove);
+      document.removeEventListener('mouseup', dragEnd);
+      document.removeEventListener('touchend', dragEnd);
+      if (syncInterval) clearInterval(syncInterval);
+      var root = document.getElementById('td-floating-root');
+      if (root) root.remove();
+      var style = document.getElementById('td-floating-style');
+      if (style) style.remove();
+      var indicator = document.getElementById('td-load-indicator');
+      if (indicator) indicator.remove();
+    } catch(e) {}
+  }
+  window.__tdCleanupFloating = cleanupFloatingPanel;
   console.log('[TavernDirector] 浮动面板注入完成 ✅ (FAB模式 · 3 Tab · 数据预览 · 持久化)');
 
   // 监听 writer.notifyUI 的执行完成事件
@@ -4272,7 +4313,7 @@
   }));
 
   // 周期性同步（仅在面板打开时）
-  setInterval(() => {
+  var syncInterval = setInterval(() => {
     if (!S.collapsed && $panel.style.display !== 'none') {
       syncData();
       render();
@@ -4425,8 +4466,8 @@ function esc(s) {
             ...original,
             settings: { ...original.settings },
             jailbreak: { ...original.jailbreak },
-            characters: original.characters,
-            messages: original.messages,
+            characters: original.characters.slice(),
+            messages: original.messages.slice(),
             worldBooks: original.worldBooks.map(wb => ({ ...wb })),
             sourceMeta: { ...original.sourceMeta },
         };
@@ -4623,6 +4664,7 @@ function esc(s) {
             onUnload() {
                 adapter.stopWatching();
                 settingsUnsubscribe();
+                if (window.__tdCleanupFloating) window.__tdCleanupFloating();
                 console.log('[TavernDirector] 已卸载');
             },
         };

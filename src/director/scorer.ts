@@ -138,7 +138,7 @@ export function sortSelectedRoles(scores: RoleSelectionScore[], selectedRoleIds:
     const sorted = selected.map((s) => s.roleId).sort((a, b) => a.localeCompare(b));
     // 用排序后的角色列表作为 key（同一组角色共享旋转状态）
     const key = sorted.join(',');
-    const lastIdx = roundRobinState.get(key) || -1;
+    const lastIdx = roundRobinState.get(key) ?? -1;
     const start = (lastIdx + 1) % sorted.length;
     // 旋转后的顺序：start...end, 0...start-1
     const rotated = sorted.slice(start).concat(sorted.slice(0, start));

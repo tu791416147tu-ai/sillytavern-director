@@ -266,6 +266,8 @@ export function injectFloatingPanel(): void {
     try {
       const tab = localStorage.getItem('td-panel-tab');
       if (tab === 'console' || tab === 'data' || tab === 'settings') S.currentTab = tab;
+      const collapsed = localStorage.getItem('td-panel-collapsed');
+      if (collapsed === 'true') { S.collapsed = true; }
     } catch { /* ignore */ }
   }
   loadPrefs();
@@ -294,7 +296,11 @@ export function injectFloatingPanel(): void {
     }
   }
   document.getElementById('td-btn-close').addEventListener('click', hidePanel);
-  $fab.addEventListener('click', showPanel);
+  let fabMoved = false;
+  $fab.addEventListener('click', (e) => {
+    if (fabMoved) { fabMoved = false; return; }
+    showPanel();
+  });
   // ── FAB 自由拖动 + 位置持久化 ──────────
   function loadFabPos() {
     try {
@@ -345,6 +351,7 @@ export function injectFloatingPanel(): void {
     fabDragging = false;
     $fab.style.cursor = 'pointer';
     $fab.style.transition = '.2s';
+    fabMoved = true;
     saveFabPos();
   }
   $fab.addEventListener('mousedown', fabDragStart);
@@ -730,11 +737,14 @@ export function injectFloatingPanel(): void {
       }));
 
       // Worldbooks with more detail
+      const oldWbMap: Record<string, { hit: boolean; hitReason: string }> = {};
+      S.worldBooks.forEach(w => { oldWbMap[w.id] = { hit: w.hit, hitReason: w.hitReason }; });
       S.worldBooks = (snap.worldBooks || []).map((w: any) => ({
         id: w.id || '', title: w.title || '',
         keys: w.keys || [], content: w.content || '',
         enabled: w.enabled !== false,
-        hit: false, hitReason: '',
+        hit: oldWbMap[w.id] ? oldWbMap[w.id].hit : false,
+        hitReason: oldWbMap[w.id] ? oldWbMap[w.id].hitReason : '',
       }));
 
       // Jailbreak
@@ -881,6 +891,26 @@ export function injectFloatingPanel(): void {
   // ═══════════════════════════════════════════════════
   syncData();
   hidePanel();
+  
+  // ── 清理（供 onUnload 调用）──
+  function cleanupFloatingPanel() {
+    document.removeEventListener('mousemove', fabDragMove);
+    document.removeEventListener('touchmove', fabDragMove);
+    document.removeEventListener('mouseup', fabDragEnd);
+    document.removeEventListener('touchend', fabDragEnd);
+    document.removeEventListener('mousemove', dragMove);
+    document.removeEventListener('touchmove', dragMove);
+    document.removeEventListener('mouseup', dragEnd);
+    document.removeEventListener('touchend', dragEnd);
+    if (syncInterval) clearInterval(syncInterval);
+    const root = document.getElementById('td-floating-root');
+    if (root) root.remove();
+    const style = document.getElementById('td-floating-style');
+    if (style) style.remove();
+    const indicator = document.getElementById('td-load-indicator');
+    if (indicator) indicator.remove();
+  }
+  (window as any).__tdCleanupFloating = cleanupFloatingPanel;
   console.log('[TavernDirector] 浮动面板注入完成 ✅ (FAB模式 · 3 Tab · 数据预览 · 持久化)');
 
   // 监听 writer.notifyUI 的执行完成事件
@@ -892,7 +922,7 @@ export function injectFloatingPanel(): void {
   }) as EventListener);
 
   // 周期性同步（仅在面板打开时）
-  setInterval(() => {
+  const syncInterval = setInterval(() => {
     if (!S.collapsed && $panel.style.display !== 'none') {
       syncData();
       render();
