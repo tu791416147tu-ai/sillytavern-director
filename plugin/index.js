@@ -3424,7 +3424,7 @@
      */
     function injectFloatingPanel() {
   // ── 悬浮窗图标 (WebP base64, 300x300, ~14KB) ──
-  const FAB_ICON = 'data:image/webp;base64,UklGRh43AABXRUJQVlA4IBI3AADw8ACdASosASwBPpFAmkmlo6IkJ7SciLASCWMAwzLvWSt/3k+ZNynTe+A73/Cl6hf7xvLedq073ooPSEx7OVvzlx0df/3LajwB2r/FP1wdr/7T4hz7O0swN/z/+76cfvP+q9gH80/Lh8XL8T/2vYC/oP979ZX/g8uv7F/Me/+x5QAAAAA';
+  const FAB_IMG = '/scripts/extensions/third-party/sillytavern-director/fab-icon.webp';
 
   // 防止重复注入
   if ((window).__tdFloatingInjected) {
