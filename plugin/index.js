@@ -3606,7 +3606,7 @@
   const root = document.createElement('div');
   root.id = 'td-floating-root';
   root.innerHTML = `
-<button id="td-fab" title="酒馆导演台"></button>
+<button id="td-fab" title="酒馆导演台"><img src="${FAB_IMG}" alt="导演" width="48" height="48" style="width:100%;height:100%;object-fit:cover;border-radius:50%" /></button>
 <div id="td-panel">
   <div id="td-header">
     <span class="td-dot off" id="td-dot" title="连接状态"></span>
