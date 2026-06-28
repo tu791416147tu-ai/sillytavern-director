@@ -3740,9 +3740,14 @@
     fabDragging = false;
     $fab.style.cursor = 'pointer';
     $fab.style.transition = '.2s';
+    fabMoved = true;
     saveFabPos();
   }
-var fabMoved = false;  $fab.addEventListener('click', function(e) {    if (fabMoved) { fabMoved = false; return; }    showPanel();  });
+  var fabMoved = false;
+  $fab.addEventListener('click', function(e) {
+    if (fabMoved) { fabMoved = false; return; }
+    showPanel();
+  });
   $fab.addEventListener('mousedown', fabDragStart);
   $fab.addEventListener('touchstart', fabDragStart, { passive: false });
   document.addEventListener('mousemove', fabDragMove);
