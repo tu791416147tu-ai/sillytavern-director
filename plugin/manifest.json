@@ -1,7 +1,7 @@
 {
   "display_name": "酒馆导演插件",
-  "version": "1.0.0",
-  "description": "多角色对话导演调度系统 —— 数据适配 + 导演调度 + 可视化控制台",
+  "version": "2.0.0",
+  "description": "多角色对话导演调度系统 — 悬浮球控制台 · 世界书/破限预览 · 长文本展开 · 偏好持久化",
   "author": "TavernDirector",
   "js": "index.js",
   "css": ""

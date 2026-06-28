@@ -3423,271 +3423,823 @@
      * 内部有重试机制：如果 document.body 尚不可用，每 200ms 重试最多 30 次。
      */
     function injectFloatingPanel() {
-    if (window.__tdFloatingInjected) { return; }
-    if (!document.body) {
-        var r = window.__tdFloatingRetries || 0;
-        if (r >= 30) { return; }
-        window.__tdFloatingRetries = r + 1;
-        setTimeout(injectFloatingPanel, 200);
-        return;
+  // ── 悬浮窗图标 (WebP base64, 300x300, ~14KB) ──
+  const FAB_ICON = 'data:image/webp;base64,UklGRh43AABXRUJQVlA4IBI3AADw8ACdASosASwBPpFAmkmlo6IkJ7SciLASCWMAwzLvWSt/3k+ZNynTe+A73/Cl6hf7xvLedq073ooPSEx7OVvzlx0df/3LajwB2r/FP1wdr/7T4hz7O0swN/z/+76cfvP+q9gH80/Lh8XL8T/2vYC/oP979ZX/g8uv7F/Me/+x5QAAAAA';
+
+  // 防止重复注入
+  if ((window).__tdFloatingInjected) {
+    console.log('[TavernDirector] 浮动面板已存在，跳过注入');
+    return;
+  }
+
+  // 等待 body 就绪
+  if (!document.body) {
+    const retries = (window).__tdFloatingRetries || 0;
+    if (retries >= 30) {
+      console.error('[TavernDirector] ⚠️ document.body 在 6 秒内未就绪，放弃注入浮动面板');
+      return;
     }
-    window.__tdFloatingInjected = true;
+    (window).__tdFloatingRetries = retries + 1;
+    console.log(`[TavernDirector] 等待 body 就绪... (${retries + 1}/30)`);
+    setTimeout(injectFloatingPanel, 200);
+    return;
+  }
 
-    // ── 读取保存的位置 ──
-    var savedPos = null;
-    try { savedPos = JSON.parse(localStorage.getItem("td-fab-pos")); } catch(e) {}
-    var posX = (savedPos && typeof savedPos.x === "number") ? savedPos.x : 16;
-    var posY = (savedPos && typeof savedPos.y === "number") ? savedPos.y : 100;
-    posX = Math.max(0, Math.min(posX, window.innerWidth - 60));
-    posY = Math.max(0, Math.min(posY, window.innerHeight - 60));
+  (window).__tdFloatingInjected = true;
+  console.log('[TavernDirector] 开始注入浮动面板...');
 
-    // ── CSS ──
-    var style = document.createElement("style");
-    style.id = "td-style";
-    style.textContent = "#td-fab{position:fixed;z-index:2147483641;width:48px;height:48px;border-radius:50%;background:rgba(22,33,62,.9);border:2.5px solid #e94560;cursor:grab;box-shadow:0 0 0 3px rgba(255,255,255,.3),0 0 20px rgba(233,69,96,.6);display:flex;align-items:center;justify-content:center;padding:0;overflow:hidden;touch-action:none;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;transition:box-shadow .3s}"+
-    "#td-fab img{width:100%;height:100%;object-fit:cover;border-radius:50%;pointer-events:none}"+
-    "#td-fab.dragging{box-shadow:0 0 0 5px rgba(255,255,255,.5),0 0 32px rgba(233,69,96,.9);transform:scale(1.08)}"+
-    "#td-fab.hidden{display:none}"+
-    "#td-panel{position:fixed;z-index:2147483640;width:340px;max-height:70vh;background:#1a1a2e;border:1px solid #2a2a4a;border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,.5);overflow:hidden;display:none;flex-direction:column}"+
-    "#td-panel.show{display:flex}"+
-    "#td-header{display:flex;align-items:center;gap:8px;padding:10px 12px;background:#16213e;cursor:grab;user-select:none;flex-shrink:0}"+
-    "#td-header .td-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}"+
-    "#td-header .td-dot.on{background:#4caf50;box-shadow:0 0 6px #4caf50}"+
-    "#td-header .td-dot.off{background:#f44336}"+
-    "#td-header .td-dot.thinking{background:#ff9800;animation:td-pulse 1s infinite}"+
-    "@keyframes td-pulse{0%,100%{opacity:1}50%{opacity:.3}}"+
-    "#td-header .td-title{flex:1;font-weight:700;font-size:13px;color:#e94560;white-space:nowrap}"+
-    "#td-header .td-summary{font-size:10px;color:#5a5a78}"+
-    "#td-header .td-btn{background:none;border:none;color:#9090a8;cursor:pointer;font-size:14px;padding:2px 4px;line-height:1}"+
-    "#td-body{flex:1;overflow-y:auto;padding:10px 12px;display:flex;flex-direction:column;gap:8px}"+
-    "#td-tabs{display:flex;border-bottom:1px solid #2a2a4a;flex-shrink:0}"+
-    "#td-tabs .td-tab{flex:1;padding:8px;text-align:center;font-size:11px;color:#6a6a88;cursor:pointer;border-bottom:2px solid transparent;background:none;border-top:none;border-left:none;border-right:1px solid #2a2a4a}"+
-    "#td-tabs .td-tab:last-child{border-right:none}"+
-    "#td-tabs .td-tab.active{color:#e0e0e0;border-bottom-color:#e94560}"+
-    ".td-section{border-bottom:1px solid #2a2a4a;padding-bottom:8px}"+
-    ".td-section-title{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:#5a5a78;margin-bottom:6px}"+
-    ".td-char-row{display:flex;align-items:center;gap:6px;padding:3px 0;font-size:11px}"+
-    ".td-char-dot{width:6px;height:6px;border-radius:50%}"+
-    ".td-char-dot.sel{background:#53a8b6}.td-char-dot.skip{background:#5a5a78}"+
-    ".td-char-name{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}"+
-    ".td-actions{display:flex;flex-wrap:wrap;gap:5px}"+
-    ".td-act{flex:1;min-width:70px;padding:7px 10px;border:1px solid #2a2a4a;border-radius:6px;background:#16213e;color:#e0e0e0;cursor:pointer;font-size:10px;text-align:center;transition:.15s;font-family:inherit}"+
-    ".td-act:hover{border-color:#e94560;background:#1f2b47}"+
-    ".td-act.primary{background:#e94560;border-color:#e94560;color:#fff;font-weight:600}"+
-    ".td-log-item{padding:4px 0;font-size:10px;border-bottom:1px solid rgba(42,42,74,.5)}"+
-    ".td-log-reason{color:#9090a8;margin-top:2px}.td-log-roles{color:#53a8b6;font-weight:500}"+
-    ".td-empty{color:#5a5a78;text-align:center;padding:12px 0;font-style:italic;font-size:11px}"+
-    ".td-banner{padding:6px 8px;border-radius:4px;font-size:10px;margin-bottom:4px}"+
-    ".td-banner.warn{background:rgba(255,152,0,.15);color:#ff9800}"+
-    ".td-banner.err{background:rgba(244,67,54,.15);color:#f44336}"+
-    ".td-banner.ok{background:rgba(76,175,80,.15);color:#4caf50}"+
-    ".td-field{display:flex;flex-direction:column;gap:3px;margin-bottom:8px}"+
-    ".td-field label{font-size:10px;color:#9090a8;font-weight:500}"+
-    ".td-field input,.td-field select,.td-field textarea{width:100%;box-sizing:border-box;padding:6px 8px;background:#0f0f1a;border:1px solid #2a2a4a;border-radius:4px;color:#e0e0e0;font-size:11px;font-family:inherit;outline:none}"+
-    ".td-bind-row{display:flex;align-items:center;gap:6px;padding:4px 0;font-size:10px}"+
-    ".td-bind-row select{flex:1;padding:4px;background:#0f0f1a;border:1px solid #2a2a4a;border-radius:3px;color:#e0e0e0;font-size:10px}"+
-    ".td-bind-row button{padding:2px 8px;border-radius:3px;background:#2a2a4a;color:#e0e0e0;border:none;cursor:pointer;font-size:10px}"+
-    "@media(max-width:480px){#td-fab{width:38px;height:38px}#td-panel{width:calc(100vw - 8px);max-height:55vh;border-radius:8px;font-size:13px}}";
-    document.head.appendChild(style);
+  // ═══════════════════════════════════════════════════
+  // Inject CSS
+  // ═══════════════════════════════════════════════════
+  const css = document.createElement('style');
+  css.id = 'td-floating-style';
+  css.textContent = `
+#td-floating-root{position:fixed;z-index:2147483640;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans SC",sans-serif;font-size:12px;line-height:1.5;color:#e0e0e0}
+#td-fab{position:fixed;right:20px;bottom:20px;z-index:2147483641;width:52px;height:52px;border-radius:50%;background:rgba(22,33,62,.9);color:#fff;border:3px solid #e94560;cursor:pointer;font-size:16px;box-shadow:0 0 0 3px rgba(255,255,255,.25),0 0 24px rgba(233,69,96,.7),0 0 48px rgba(233,69,96,.3);transition:.2s;display:flex;align-items:center;justify-content:center;padding:0;overflow:hidden;animation:td-fab-pulse 3s ease-in-out infinite}
+#td-fab img{width:100%;height:100%;object-fit:cover;border-radius:50%}
+#td-fab:hover{transform:scale(1.12);border-color:#ff6b81;box-shadow:0 0 0 4px rgba(255,255,255,.4),0 0 32px rgba(233,69,96,.85),0 0 56px rgba(233,69,96,.45)}
+@keyframes td-fab-pulse{0%,100%{box-shadow:0 0 0 3px rgba(255,255,255,.25),0 0 24px rgba(233,69,96,.7),0 0 48px rgba(233,69,96,.3)}50%{box-shadow:0 0 0 5px rgba(255,255,255,.45),0 0 36px rgba(233,69,96,.9),0 0 60px rgba(233,69,96,.5)}}
+#td-fab.hidden{display:none}
+#td-panel{position:fixed;right:16px;bottom:72px;z-index:2147483640;width:380px;max-height:82vh;background:#1a1a2e;border:1px solid #2a2a4a;border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,.5);overflow:hidden;display:flex;flex-direction:column;transition:.2s;resize:both;min-width:320px}
+#td-panel.collapsed{max-height:40px;resize:none}
+#td-header{display:flex;align-items:center;gap:8px;padding:10px 12px;background:#16213e;cursor:grab;user-select:none;flex-shrink:0}
+#td-header:active{cursor:grabbing}
+#td-header .td-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;transition:.2s}
+#td-header .td-dot.on{background:#4caf50;box-shadow:0 0 6px #4caf50}
+#td-header .td-dot.off{background:#f44336}
+#td-header .td-dot.thinking{background:#ff9800;animation:td-pulse 1s infinite}
+@keyframes td-pulse{0%,100%{opacity:1}50%{opacity:.3}}
+#td-header .td-title{flex:1;font-weight:700;font-size:13px;color:#e94560;white-space:nowrap}
+#td-header .td-summary{font-size:10px;color:#5a5a78}
+#td-header .td-btn{background:none;border:none;color:#9090a8;cursor:pointer;font-size:14px;padding:2px 4px;line-height:1}
+#td-header .td-btn:hover{color:#e0e0e0}
+#td-tabs{display:flex;border-bottom:1px solid #2a2a4a;flex-shrink:0}
+#td-tabs .td-tab{flex:1;padding:8px 4px;text-align:center;font-size:10px;color:#6a6a88;cursor:pointer;border-bottom:2px solid transparent;transition:.15s;background:none;border-top:none;border-left:none;border-right:1px solid #2a2a4a}
+#td-tabs .td-tab:last-child{border-right:none}
+#td-tabs .td-tab.active{color:#e0e0e0;border-bottom-color:#e94560}
+#td-tabs .td-tab:hover{color:#e0e0e0}
+#td-body{flex:1;overflow-y:auto;padding:10px 12px;display:flex;flex-direction:column;gap:8px;max-height:60vh}
+#td-body.collapsed{display:none}
+.td-section{border-bottom:1px solid #2a2a4a;padding-bottom:8px;margin-bottom:2px}
+.td-section:last-child{border-bottom:none;padding-bottom:0}
+.td-section-title{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:#5a5a78;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center}
+.td-section-count{font-size:9px;color:#5a5a78;background:#0f0f1a;padding:1px 6px;border-radius:8px}
 
-    // ── 图片 ──
-    var IMG = "/scripts/extensions/third-party/sillytavern-director/fab-icon.webp";
+/* 角色卡片 */
+.td-char-card{display:flex;align-items:center;gap:6px;padding:5px 6px;border-radius:4px;margin-bottom:2px;transition:.15s;border:1px solid transparent}
+.td-char-card:hover{background:rgba(83,168,182,.08)}
+.td-char-card.sel{border-color:#53a8b6;background:rgba(83,168,182,.12)}
+.td-char-card.disabled{opacity:.45}
+.td-char-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.td-char-dot.sel{background:#53a8b6}
+.td-char-dot.skip{background:#5a5a78}
+.td-char-name{flex:1;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500}
+.td-char-status{font-size:9px;padding:1px 5px;border-radius:6px;flex-shrink:0}
+.td-char-status.on{color:#4caf50;background:rgba(76,175,80,.15)}
+.td-char-status.off{color:#f44336;background:rgba(244,67,54,.1)}
+.td-char-badge{font-size:8px;padding:1px 5px;border-radius:6px;background:#53a8b6;color:#fff;flex-shrink:0}
 
-    // ── FAB ──
-    var fab = document.createElement("div");
-    fab.id = "td-fab";
-    fab.title = "导演台 — 长按拖动";
-    fab.innerHTML = '<img src="' + IMG + '" alt="导演" />';
-    fab.style.left = posX + "px";
-    fab.style.top = posY + "px";
-    document.body.appendChild(fab);
+/* 操作按钮 */
+.td-actions{display:flex;flex-wrap:wrap;gap:5px}
+.td-act{flex:1;min-width:65px;padding:6px 8px;border:1px solid #2a2a4a;border-radius:6px;background:#16213e;color:#e0e0e0;cursor:pointer;font-size:10px;text-align:center;transition:.15s;white-space:nowrap;font-family:inherit}
+.td-act:hover{border-color:#e94560;background:#1f2b47}
+.td-act.primary{background:#e94560;border-color:#e94560;color:#fff;font-weight:600}
+.td-act.primary:hover{background:#d63850}
+.td-act.danger{border-color:#f44336;color:#f44336}
+.td-act.danger:hover{background:rgba(244,67,54,.15)}
 
-    // ── 面板 ──
-    var panel = document.createElement("div");
-    panel.id = "td-panel";
-    panel.innerHTML = '<div id="td-header">'+
-      '<span class="td-dot off" id="td-dot"></span>'+
-      '<span class="td-title">🎬 导演台</span>'+
-      '<span class="td-summary" id="td-summary"></span>'+
-      '<button class="td-btn" id="td-btn-min">−</button>'+
-      '<button class="td-btn" id="td-btn-close">✕</button>'+
-      '</div>'+
-      '<div id="td-tabs">'+
-      '<button class="td-tab active" data-tab="console">🎯 控制台</button>'+
-      '<button class="td-tab" data-tab="settings">⚙️ 配置</button>'+
-      '</div>'+
-      '<div id="td-body"></div>'+
-      '<div id="td-banner-area"></div>';
-    document.body.appendChild(panel);
+/* 日志 */
+.td-log-item{padding:4px 0;font-size:10px;border-bottom:1px solid rgba(42,42,74,.5)}
+.td-log-item:last-child{border-bottom:none}
+.td-log-reason{color:#9090a8;margin-top:2px}
+.td-log-roles{color:#53a8b6;font-weight:500}
+.td-log-skipped{font-size:9px;color:#5a5a78}
+.td-empty{color:#5a5a78;text-align:center;padding:12px 0;font-style:italic;font-size:11px}
 
-    // ── refs ──
-    var $body = document.getElementById("td-body");
-    var $dot = document.getElementById("td-dot");
-    var $summary = document.getElementById("td-summary");
-    var $btnMin = document.getElementById("td-btn-min");
-    var $banner = document.getElementById("td-banner-area");
-    var $tabs = document.querySelectorAll("#td-tabs .td-tab");
+/* 消息气泡 */
+.td-msg-item{padding:5px 0;border-bottom:1px solid rgba(42,42,74,.4);font-size:10px}
+.td-msg-item:last-child{border-bottom:none}
+.td-msg-speaker{font-weight:600;color:#53a8b6;margin-bottom:1px}
+.td-msg-speaker.user{color:#e94560}
+.td-msg-speaker.system{color:#f0c060}
+.td-msg-content{color:#c0c0d0;line-height:1.4}
+.td-msg-truncated{cursor:pointer;color:#9090a8}
+.td-msg-truncated:hover{text-decoration:underline;text-decoration-color:#53a8b6}
+.td-msg-teaser{color:#53a8b6;font-weight:bold}
 
-    // ── state ──
-    var S = { connected: false, collapsed: false, currentTab: "console", characters: [], logs: [] };
-    function esc(s) { return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
-    function getTD() { return window.TavernDirector || {}; }
-    var bannerTimer = null;
-    function showBanner(msg, type) {
-        type = type || "warn";
-        if ($banner) $banner.innerHTML = '<div class="td-banner '+type+'">'+esc(msg)+'</div>';
-        if (bannerTimer) clearTimeout(bannerTimer);
-        if (type !== "err") bannerTimer = setTimeout(function(){ if($banner)$banner.innerHTML=""; }, 4000);
+/* 世界书条目 */
+.td-wb-item{padding:4px 0;border-bottom:1px solid rgba(42,42,74,.4);font-size:10px}
+.td-wb-item:last-child{border-bottom:none}
+.td-wb-title{font-weight:600;display:flex;gap:4px;align-items:center}
+.td-wb-hit{font-size:9px;padding:1px 5px;border-radius:4px}
+.td-wb-hit.yes{background:rgba(76,175,80,.2);color:#4caf50}
+.td-wb-hit.no{color:#5a5a78}
+.td-wb-keys{color:#53a8b6;font-size:9px;margin-top:1px}
+
+/* 破限预览 */
+.td-jb-text{background:#0f0f1a;padding:8px;border-radius:4px;font-size:10px;max-height:100px;overflow-y:auto;white-space:pre-wrap;color:#9090a8;font-family:monospace}
+.td-jb-truncated{cursor:pointer}
+.td-jb-truncated:hover{color:#53a8b6}
+
+/* 横幅 */
+.td-banner{padding:6px 8px;border-radius:4px;font-size:10px;margin-bottom:4px}
+.td-banner.warn{background:rgba(255,152,0,.15);color:#ff9800}
+.td-banner.err{background:rgba(244,67,54,.15);color:#f44336}
+.td-banner.ok{background:rgba(76,175,80,.15);color:#4caf50}
+
+/* 表单 */
+.td-field{display:flex;flex-direction:column;gap:3px;margin-bottom:8px}
+.td-field label{font-size:10px;color:#9090a8;font-weight:500}
+.td-field input,.td-field select,.td-field textarea{width:100%;box-sizing:border-box;padding:6px 8px;background:#0f0f1a;border:1px solid #2a2a4a;border-radius:4px;color:#e0e0e0;font-size:11px;font-family:inherit;outline:none}
+.td-field input:focus,.td-field select:focus,.td-field textarea:focus{border-color:#e94560}
+.td-field textarea{resize:vertical;min-height:55px}
+.td-field-row{display:flex;gap:6px}
+.td-field-row .td-field{flex:1}
+.td-help{font-size:9px;color:#5a5a78;margin-top:2px}
+.td-bind-row{display:flex;align-items:center;gap:6px;padding:4px 0;font-size:10px}
+.td-bind-row select{flex:1;padding:4px;background:#0f0f1a;border:1px solid #2a2a4a;border-radius:3px;color:#e0e0e0;font-size:10px}
+.td-bind-row button{padding:2px 8px;border-radius:3px;background:#2a2a4a;color:#e0e0e0;border:none;cursor:pointer;font-size:10px}
+.td-bind-row button:hover{background:#e94560}
+.td-bind-row button.del:hover{background:#f44336}
+
+/* KV行 */
+.td-kv{display:flex;justify-content:space-between;padding:2px 0;font-size:10px}
+.td-kv .td-kv-key{color:#5a5a78}
+.td-kv .td-kv-val{color:#e0e0e0;font-weight:500}
+
+/* 响应式 */
+@media (max-width: 480px) {
+  #td-fab{right:12px;bottom:12px;width:60px;height:60px;border-radius:50%}
+  #td-panel{right:4px;bottom:64px;width:calc(100vw - 8px);max-height:62vh;border-radius:8px;font-size:13px;resize:none;min-width:auto}
+  #td-panel.collapsed{max-height:44px}
+  #td-header{padding:12px;font-size:14px}
+  .td-act{padding:8px 10px;font-size:11px;min-width:55px}
+  .td-tab{font-size:11px;padding:10px}
+  #td-body{padding:8px 10px;max-height:50vh}
+  .td-field input,.td-field select,.td-field textarea{font-size:13px;padding:8px}
+}
+`.trim();
+  document.head.appendChild(css);
+  console.log('[TavernDirector] CSS 已注入');
+
+  // ═══════════════════════════════════════════════════
+  // Loading indicator
+  // ═══════════════════════════════════════════════════
+  const $indicator = document.createElement('div');
+  $indicator.id = 'td-load-indicator';
+  $indicator.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:2147483642;'
+    + 'background:linear-gradient(135deg,#1a1a2e,#0f3460);color:#e0e0e0;text-align:center;'
+    + 'padding:5px 8px;font-size:12px;font-weight:500;font-family:sans-serif;'
+    + 'border-bottom:1px solid rgba(233,69,96,.25);'
+    + 'transition:opacity .4s ease,transform .4s ease;will-change:opacity,transform;';
+  $indicator.innerHTML = '🎬 <b>导演台已加载</b> — 点击右下角头像按钮打开控制台';
+  document.body.appendChild($indicator);
+  setTimeout(() => {
+    $indicator.style.opacity = '0';
+    $indicator.style.transform = 'translateY(-100%)';
+    setTimeout(() => { try { $indicator.remove(); } catch {} }, 500);
+  }, 5000);
+
+  // ═══════════════════════════════════════════════════
+  // Inject HTML
+  // ═══════════════════════════════════════════════════
+  const root = document.createElement('div');
+  root.id = 'td-floating-root';
+  root.innerHTML = `
+<button id="td-fab" title="酒馆导演台"><img src="${FAB_ICON}" alt="导演" width="48" height="48" /></button>
+<div id="td-panel">
+  <div id="td-header">
+    <span class="td-dot off" id="td-dot" title="连接状态"></span>
+    <span class="td-title">🎬 导演台</span>
+    <span class="td-summary" id="td-summary">未连接</span>
+    <button class="td-btn" id="td-btn-min" title="折叠">−</button>
+    <button class="td-btn" id="td-btn-close" title="关闭">✕</button>
+  </div>
+  <div id="td-tabs">
+    <button class="td-tab active" data-tab="console">🎯 控制台</button>
+    <button class="td-tab" data-tab="data">📊 数据</button>
+    <button class="td-tab" data-tab="settings">⚙️ 配置</button>
+  </div>
+  <div id="td-body"></div>
+  <div id="td-banner-area"></div>
+</div>`.trim();
+  document.body.appendChild(root);
+  console.log('[TavernDirector] DOM 已注入');
+
+  // ═══════════════════════════════════════════════════
+  // DOM refs
+  // ═══════════════════════════════════════════════════
+  const $fab = document.getElementById('td-fab');
+  const $panel = document.getElementById('td-panel');
+  const $body = document.getElementById('td-body');
+  const $dot = document.getElementById('td-dot');
+  const $summary = document.getElementById('td-summary');
+  const $btnMin = document.getElementById('td-btn-min');
+  const $banner = document.getElementById('td-banner-area');
+  const $tabs = document.querySelectorAll('#td-tabs .td-tab');
+
+  // ═══════════════════════════════════════════════════
+  // State
+  // ═══════════════════════════════════════════════════
+
+
+  const S = {
+    connected: false, directorStatus: 'idle', collapsed: false,
+    currentTab: 'console',
+    worldBooks: [], jailbreak: { text: '', source: 'none', enabled: false, name: '' },
+    messages: [], characters: [], logs: [],
+  };
+
+  // ═══════════════════════════════════════════════════
+  // localStorage persistence
+  // ═══════════════════════════════════════════════════
+  function savePrefs() {
+    try {
+      localStorage.setItem('td-panel-tab', S.currentTab);
+      localStorage.setItem('td-panel-collapsed', String(S.collapsed));
+    } catch { /* quota exceeded */ }
+  }
+  function loadPrefs() {
+    try {
+      const tab = localStorage.getItem('td-panel-tab');
+      if (tab === 'console' || tab === 'data' || tab === 'settings') S.currentTab = tab;
+    } catch { /* ignore */ }
+  }
+  loadPrefs();
+
+  // ═══════════════════════════════════════════════════
+  // Panel: collapse / expand / show / hide
+  // ═══════════════════════════════════════════════════
+  function collapse() { S.collapsed = true; $panel.classList.add('collapsed'); $body.classList.add('collapsed'); $btnMin.textContent = '+'; savePrefs(); }
+  function expand() { S.collapsed = false; $panel.classList.remove('collapsed'); $body.classList.remove('collapsed'); $btnMin.textContent = '−'; render(); }
+  $btnMin.addEventListener('click', () => S.collapsed ? expand() : collapse());
+
+  function hidePanel() { $panel.style.display = 'none'; $fab.classList.remove('hidden'); }
+  function showPanel() {
+    try {
+      $panel.style.display = 'flex';
+      $fab.classList.add('hidden');
+      expand();
+      syncData();
+    } catch (e) {
+      console.warn('[TavernDirector] 面板展开失败，回退到FAB模式', e);
+      $fab.classList.remove('hidden');
     }
+  }
+  document.getElementById('td-btn-close')!.addEventListener('click', hidePanel);
+  $fab.addEventListener('click', showPanel);
 
-    // ── 面板开关 ──
-    function panelPos() {
-        var fr = fab.getBoundingClientRect();
-        var pw = panel.offsetWidth || 340, ph = panel.offsetHeight || 400;
-        var pl = fr.left, pt = fr.bottom + 12;
-        if (pt + ph > window.innerHeight) pt = fr.top - ph - 12;
-        if (pl + pw > window.innerWidth) pl = window.innerWidth - pw - 8;
-        panel.style.left = Math.max(4, pl) + "px";
-        panel.style.top = Math.max(4, pt) + "px";
+  // ── Draggable header (mouse + touch) ──────────
+  let dragging = false, offX = 0, offY = 0;
+  const headerEl = document.getElementById('td-header');
+
+  function dragStart(e) {
+    if ((e.target).tagName === 'BUTTON') return;
+    dragging = true;
+    const r = $panel.getBoundingClientRect();
+    const p = 'touches' in e ? e.touches[0] : e;
+    offX = p.clientX - r.left;
+    offY = p.clientY - r.top;
+    $panel.style.transition = 'none';
+  }
+  function dragMove(e) {
+    if (!dragging) return;
+    const p = 'touches' in e ? e.touches[0] : e;
+    $panel.style.right = 'auto'; $panel.style.bottom = 'auto';
+    $panel.style.left = (p.clientX - offX) + 'px';
+    $panel.style.top = (p.clientY - offY) + 'px';
+  }
+  function dragEnd() {
+    if (dragging) { dragging = false; $panel.style.transition = '.2s'; }
+  }
+
+  headerEl.addEventListener('mousedown', dragStart);
+  headerEl.addEventListener('touchstart', dragStart, { passive: false });
+  document.addEventListener('mousemove', dragMove);
+  document.addEventListener('touchmove', dragMove, { passive: false });
+  document.addEventListener('mouseup', dragEnd);
+  document.addEventListener('touchend', dragEnd);
+
+  // ── Tab switching ─────────────────────────────
+  $tabs.forEach(t => t.addEventListener('click', () => {
+    S.currentTab = (t).dataset.tab;
+    $tabs.forEach(tt => tt.classList.remove('active'));
+    t.classList.add('active');
+    savePrefs();
+    render();
+  }));
+
+  // ── Apply saved tab preference ────────────────
+  $tabs.forEach(t => {
+    if ((t).dataset.tab === S.currentTab) {
+      $tabs.forEach(tt => tt.classList.remove('active'));
+      t.classList.add('active');
     }
-    function openPanel() { panel.classList.add("show"); panelPos(); render(); syncData(); }
-    function closePanel() { panel.classList.remove("show"); }
-    function collapse() { S.collapsed = true; $body.style.display = "none"; $btnMin.textContent = "+"; }
-    function expandP() { S.collapsed = false; $body.style.display = ""; $btnMin.textContent = "−"; render(); }
+  });
 
-    // ── 数据 ──
-    function syncData() {
-        var TD = getTD();
-        try {
-            var snap = TD.getSnapshot ? TD.getSnapshot() : {};
-            if (!snap || !snap.characters) { S.connected = false; return; }
-            S.connected = true;
-            S.characters = (snap.characters || []).map(function(c) {
-                return { id: c.id, name: c.displayName || c.name, status: c.status || "enabled", isNarrator: !!c.isNarrator, isSelected: false };
-            });
-            $dot.className = "td-dot on";
-            $summary.textContent = S.characters.length + "角色";
-        } catch(e) { S.connected = false; $dot.className = "td-dot off"; $summary.textContent = "未连接"; }
+  // ═══════════════════════════════════════════════════
+  // Render
+  // ═══════════════════════════════════════════════════
+  function render() {
+    if (S.collapsed) return;
+    if (S.currentTab === 'console') renderConsole();
+    else if (S.currentTab === 'data') renderData();
+    else renderSettings();
+  }
+
+  // ─── Tab 1: Console ────────────────────────────
+  function renderConsole() {
+    const charsHTML = !S.characters.length
+      ? '<div class="td-empty">等待数据...</div>'
+      : S.characters.map(c =>
+          `<div class="td-char-card ${c.isSelected ? 'sel' : ''} ${c.status === 'disabled' ? 'disabled' : ''}" title="${c.status === 'enabled' ? '已启用' : '已禁用'}${c.isNarrator ? ' · 旁白' : ''}${c.model ? ' · ' + esc(c.model) : ''}">
+            <span class="td-char-dot ${c.isSelected ? 'sel' : c.status === 'disabled' ? 'skip' : ''}"></span>
+            <span class="td-char-name">${esc(c.name)}</span>
+            ${c.isNarrator ? '<span class="td-char-badge">旁白</span>' : ''}
+            ${c.isSelected ? '<span class="td-char-badge" style="background:#e94560">选中</span>' : ''}
+            <span class="td-char-status ${c.status === 'enabled' ? 'on' : 'off'}">${c.status === 'enabled' ? '启用' : '禁用'}</span>
+          </div>`
+        ).join('');
+
+    const logsHTML = !S.logs.length
+      ? '<div class="td-empty">尚未执行调度</div>'
+      : S.logs.slice(0, 5).map(l => {
+          const names = l.orderedRoles.length
+            ? l.orderedRoles.map(id => { const c = S.characters.find(cc => cc.id === id); return c ? c.name : id; }).join(' → ')
+            : l.selectedRoles.map(id => { const c = S.characters.find(cc => cc.id === id); return c ? c.name : id; }).join('、') || '无';
+          const skipped = l.skippedRoles?.length
+            ? `<div class="td-log-skipped">⏭ ${l.skippedRoles.map(id => { const c = S.characters.find(cc => cc.id === id); return c ? c.name : id; }).join('、')}</div>`
+            : '';
+          return `<div class="td-log-item">
+            <span style="color:#5a5a78">${new Date(l.timestamp).toLocaleTimeString()} · ${esc(l.mode || 'seq')}</span>
+            <span class="td-log-roles">${esc(names)}</span>
+            ${skipped}
+            <div class="td-log-reason">${esc(l.reason)}</div>
+          </div>`;
+        }).join('');
+
+    const statusLabel = S.directorStatus === 'idle' ? '待命' :
+      S.directorStatus === 'thinking' ? '思考中...' :
+      S.directorStatus === 'running' ? '执行中...' :
+      S.directorStatus === 'done' ? '已完成' : '错误';
+
+    $body.innerHTML = `
+      <div class="td-section">
+        <div class="td-section-title">👥 角色 <span class="td-section-count">${S.characters.length}</span></div>
+        ${charsHTML}
+      </div>
+      <div class="td-section">
+        <div class="td-section-title">🎯 操作 · <span style="font-weight:400;color:#5a5a78">${statusLabel}</span></div>
+        <div class="td-actions">
+          <button class="td-act primary" id="td-act-run">🎯 导演决定</button>
+          <button class="td-act" id="td-act-speakers">👤 指定发言</button>
+        </div>
+        <div class="td-actions" style="margin-top:5px">
+          <button class="td-act" id="td-act-all">📢 全员旁白</button>
+          <button class="td-act" id="td-act-rr">🔄 全员轮流</button>
+        </div>
+        <div class="td-actions" style="margin-top:5px">
+          <button class="td-act" id="td-act-fullauto">⚡ 全自动</button>
+          <button class="td-act danger" id="td-act-clear">🗑 清空日志</button>
+        </div>
+      </div>
+      <div class="td-section">
+        <div class="td-section-title">📋 最近调度 <span class="td-section-count">${S.logs.length}</span></div>
+        ${logsHTML}
+      </div>`;
+
+    document.getElementById('td-act-run')?.addEventListener('click', () => doDirector({}));
+    document.getElementById('td-act-speakers')?.addEventListener('click', () => doSelectSpeakers());
+    document.getElementById('td-act-all')?.addEventListener('click', () => doAllSpeak('parallel'));
+    document.getElementById('td-act-rr')?.addEventListener('click', () => doAllSpeak('sequential'));
+    document.getElementById('td-act-fullauto')?.addEventListener('click', () => doFullAuto());
+    document.getElementById('td-act-clear')?.addEventListener('click', () => {
+      if (confirm('确定清空所有导演日志？此操作不可撤销。')) {
+        S.logs = [];
+        renderConsole();
+        showBanner('日志已清空', 'ok');
+      }
+    });
+  }
+
+  // ─── Tab 2: Data (chat + worldbook + jailbreak) ─
+  function renderData() {
+    // Chat messages (recent 15)
+    const msgs = S.messages.slice(-15);
+    const msgsHTML = !msgs.length
+      ? '<div class="td-empty">暂无消息</div>'
+      : msgs.map(m => {
+          const content = esc(m.content);
+          const truncated = content.length > 150
+            ? `<span class="td-msg-truncated" onclick="var f=this.nextElementSibling;var t=this;if(f.style.display==='none'){f.style.display='inline';t.style.display='none'}else{f.style.display='none';t.style.display='inline'}">${content.substring(0,150)}<span class="td-msg-teaser"> …展开</span></span><span style="display:none">${content}</span>`
+            : content;
+          return `<div class="td-msg-item">
+            <div class="td-msg-speaker ${m.role}">${esc(m.speaker || m.role)} ${m.isDirectorDecision ? '🎬' : ''}</div>
+            <div class="td-msg-content">${truncated}</div>
+          </div>`;
+        }).join('');
+
+    // Worldbook entries (top 8, with hit status)
+    const wbsHTML = !S.worldBooks.length
+      ? '<div class="td-empty">无世界书条目</div>'
+      : S.worldBooks.slice(0, 8).map(w =>
+          `<div class="td-wb-item">
+            <div class="td-wb-title">
+              ${esc(w.title || '未命名')}
+              ${w.hit ? '<span class="td-wb-hit yes">✓ 命中</span>' : '<span class="td-wb-hit no">—</span>'}
+              ${!w.enabled ? '<span style="color:#f44336;font-size:9px">禁用</span>' : ''}
+            </div>
+            <div class="td-wb-keys">${w.keys.slice(0,3).map(esc).join(', ') || '无触发词'}</div>
+            ${w.hit && w.hitReason ? `<div style="font-size:9px;color:#4caf50">${esc(w.hitReason)}</div>` : ''}
+          </div>`
+        ).join('');
+
+    // Jailbreak preview (expandable)
+    const jb = S.jailbreak;
+    const jbHTML = jb.text
+      ? `<div class="td-jb-text">${jb.text.length > 200
+          ? `<span class="td-jb-truncated" onclick="var f=this.nextElementSibling;var t=this;if(f.style.display==='none'){f.style.display='inline';t.style.display='none'}else{f.style.display='none';t.style.display='inline'}">${esc(jb.text.substring(0,200))}…<span style="color:#53a8b6;font-weight:bold">展开</span></span><span style="display:none">${esc(jb.text)}</span>`
+          : esc(jb.text)}</div>`
+      : '<div class="td-empty">未加载破限</div>';
+
+    $body.innerHTML = `
+      <div class="td-section">
+        <div class="td-section-title">💬 最近消息 <span class="td-section-count">${S.messages.length}</span></div>
+        ${msgsHTML}
+      </div>
+      <div class="td-section">
+        <div class="td-section-title">📖 世界书 <span class="td-section-count">${S.worldBooks.length}</span></div>
+        ${wbsHTML}
+      </div>
+      <div class="td-section">
+        <div class="td-section-title">🔓 破限 ${jb.enabled ? '✅' : '⛔'} <span class="td-section-count">${jb.source}</span></div>
+        ${jbHTML}
+        ${jb.name ? `<div class="td-kv"><span class="td-kv-key">名称</span><span class="td-kv-val">${esc(jb.name)}</span></div>` : ''}
+      </div>
+      <div class="td-section">
+        <div class="td-section-title">📋 会话统计</div>
+        <div class="td-kv"><span class="td-kv-key">角色</span><span class="td-kv-val">${S.characters.length} 位</span></div>
+        <div class="td-kv"><span class="td-kv-key">消息</span><span class="td-kv-val">${S.messages.length} 条</span></div>
+        <div class="td-kv"><span class="td-kv-key">世界书</span><span class="td-kv-val">${S.worldBooks.length} 条</span></div>
+        <div class="td-kv"><span class="td-kv-key">调度记录</span><span class="td-kv-val">${S.logs.length} 次</span></div>
+      </div>`;
+  }
+
+  // ─── Tab 3: Settings ──────────────────────────
+  function renderSettings() {
+    const TD = (window).TavernDirector || {};
+    const raw = TD.settings?.getRaw ? TD.settings.getRaw() : {};
+
+    const getModels = () => {
+      try { return raw.fallbackModels?.join(', ') || ''; } catch { return ''; }
+    };
+
+    let charOpts = '';
+    try {
+      const snap = TD.getSnapshot?.() || {};
+      (snap.characters || []).forEach((c) => {
+        const mid = raw.roleModels?.[c.id] || '';
+        charOpts += `<div class="td-bind-row">
+          <span style="width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px">${esc(c.displayName || c.name)}</span>
+          <input type="text" class="td-bind-model" data-role-id="${esc(c.id)}" value="${esc(mid)}" placeholder="模型名" style="flex:1;padding:3px 6px;background:#0f0f1a;border:1px solid #2a2a4a;border-radius:3px;color:#e0e0e0;font-size:10px">
+        </div>`;
+      });
+    } catch { charOpts = '<div class="td-empty">无角色数据</div>'; }
+
+    $body.innerHTML = `
+      <div class="td-section">
+        <div class="td-section-title">🔧 模型配置</div>
+        <div class="td-field">
+          <label>默认模型</label>
+          <input type="text" id="td-cfg-defaultModel" value="${esc(raw.defaultModel || '')}" placeholder="e.g. openai/gpt-4o">
+          <span class="td-help">全局兜底模型，角色无专属模型时使用</span>
+        </div>
+        <div class="td-field">
+          <label>导演模型 ${raw.directorModel ? '✅' : '⚠️'}</label>
+          <input type="text" id="td-cfg-directorModel" value="${esc(raw.directorModel || '')}" placeholder="e.g. anthropic/claude-opus-4-8">
+          <span class="td-help">导演评分/选角/上下文使用此模型</span>
+        </div>
+        <div class="td-field">
+          <label>降级模型链（逗号分隔）</label>
+          <input type="text" id="td-cfg-fallbackModels" value="${esc(getModels())}" placeholder="model-a, model-b, model-c">
+          <span class="td-help">主模型失败时按此顺序尝试降级</span>
+        </div>
+        <div class="td-field">
+          <label>角色→模型绑定</label>
+          ${charOpts}
+          <span class="td-help">每行一个角色。修改后自动保存</span>
+        </div>
+      </div>
+      <div class="td-section">
+        <div class="td-section-title">📝 破限文本</div>
+        <div class="td-field">
+          <textarea id="td-cfg-jailbreak" placeholder="在此粘贴自定义破限/系统提示...">${esc(raw.jailbreakText || '')}</textarea>
+          <span class="td-help">留空则使用角色卡内置破限</span>
+        </div>
+      </div>
+      <div class="td-section">
+        <div class="td-section-title">🔗 世界书绑定</div>
+        <div class="td-help" style="margin-bottom:4px">格式：entryId:roleId,roleId。每行一个绑定</div>
+        <textarea id="td-cfg-wb-text" style="width:100%;min-height:50px;margin-top:4px;background:#0f0f1a;border:1px solid #2a2a4a;color:#e0e0e0;font-size:10px;border-radius:4px;padding:4px" placeholder="wb_entry_01:char_001,char_002&#10;wb_entry_02:char_001"></textarea>
+      </div>
+      <div class="td-section">
+        <div class="td-section-title">💾 数据管理</div>
+        <div class="td-actions">
+          <button class="td-act" id="td-cfg-export">📥 导出</button>
+          <button class="td-act" id="td-cfg-import">📤 导入</button>
+          <button class="td-act" id="td-cfg-reset" style="border-color:#f44336;color:#f44336">⚠️ 重置</button>
+        </div>
+        <div class="td-actions" style="margin-top:5px">
+          <button class="td-act primary" id="td-cfg-save">💾 保存配置</button>
+        </div>
+      </div>`;
+
+    try {
+      const binds = raw.worldbookBindings || {};
+      const lines = Object.entries(binds).map(([k, v]) => `${k}:${(v as string[]).join(',')}`);
+      (document.getElementById('td-cfg-wb-text')).value = lines.join('\n');
+    } catch { /* ignore */ }
+
+    document.getElementById('td-cfg-save')?.addEventListener('click', () => saveAllSettings());
+    document.getElementById('td-cfg-export')?.addEventListener('click', () => {
+      const json = TD.exportConfig?.() || '{}';
+      navigator.clipboard?.writeText(json).then(() => showBanner('配置已复制到剪贴板', 'ok')).catch(() => {
+        const blob = new Blob([json], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href = url; a.download = 'tavern-director-config.json'; a.click();
+        URL.revokeObjectURL(url);
+        showBanner('配置已下载', 'ok');
+      });
+    });
+    document.getElementById('td-cfg-import')?.addEventListener('click', () => {
+      const input = document.createElement('input');
+      input.type = 'file'; input.accept = '.json';
+      input.onchange = async () => {
+        const file = input.files?.[0];
+        if (!file) return;
+        const text = await file.text();
+        const result = TD.importConfig?.(text) || { success: false, message: 'importConfig 不可用' };
+        showBanner(result.message, result.success ? 'ok' : 'err');
+        if (result.success) setTimeout(render, 300);
+      };
+      input.click();
+    });
+    document.getElementById('td-cfg-reset')?.addEventListener('click', () => {
+      if (confirm('确定要重置所有配置？此操作不可撤销。')) {
+        TD.resetConfig?.();
+        showBanner('配置已重置为默认值', 'ok');
+        setTimeout(render, 300);
+      }
+    });
+
+    document.querySelectorAll('.td-bind-model').forEach(inp => {
+      inp.addEventListener('change', () => {
+        const roleId = (inp).dataset.roleId || '';
+        const modelId = (inp).value.trim();
+        if (roleId) TD.setRoleModel?.(roleId, modelId);
+      });
+    });
+  }
+
+  function saveAllSettings() {
+    const TD = (window).TavernDirector || {};
+    const defaultModel = (document.getElementById('td-cfg-defaultModel'))?.value?.trim() || '';
+    const directorModel = (document.getElementById('td-cfg-directorModel'))?.value?.trim() || '';
+    const fallbackRaw = (document.getElementById('td-cfg-fallbackModels'))?.value || '';
+    const fallbackModels = fallbackRaw.split(',').map((s) => s.trim()).filter(Boolean);
+    const jailbreak = (document.getElementById('td-cfg-jailbreak'))?.value || '';
+    const wbRaw = (document.getElementById('td-cfg-wb-text'))?.value || '';
+
+    TD.setDefaultModel?.(defaultModel);
+    TD.setDirectorModel?.(directorModel);
+    TD.setFallbackModels?.(fallbackModels);
+    TD.setJailbreak?.(jailbreak);
+
+    const binds: Record<string, string[]> = {};
+    wbRaw.split('\n').forEach((line) => {
+      const [entryId, rolesStr] = line.split(':').map(s => s.trim());
+      if (entryId && rolesStr) binds[entryId] = rolesStr.split(',').map(s => s.trim()).filter(Boolean);
+    });
+    if (TD.settings?.setWorldbookBindings) TD.settings.setWorldbookBindings(binds);
+
+    document.querySelectorAll('.td-bind-model').forEach(inp => {
+      const roleId = (inp).dataset.roleId || '';
+      const modelId = (inp).value.trim();
+      if (roleId && modelId) TD.setRoleModel?.(roleId, modelId);
+    });
+
+    showBanner('配置已保存 ✅', 'ok');
+  }
+
+  // ═══════════════════════════════════════════════════
+  // Actions
+  // ═══════════════════════════════════════════════════
+  function getTD() { return (window).TavernDirector || {}; }
+
+  function syncData() {
+    const TD = getTD();
+    try {
+      const snap = TD.getSnapshot?.() || {};
+      if (!snap || !snap.characters) { S.connected = false; return; }
+      S.connected = true;
+
+      // Characters with more detail
+      S.characters = (snap.characters || []).map((c) => ({
+        id: c.id || c.name || '',
+        name: c.displayName || c.name || '',
+        status: c.status || 'enabled',
+        isNarrator: !!c.isNarrator,
+        isSelected: false,
+        model: c.model || '',
+        avatar: c.avatar || '',
+      }));
+
+      // Messages (last 50 for data tab)
+      S.messages = (snap.messages || []).slice(-50).map((m, i) => ({
+        id: m.id || `m_${i}`,
+        role: m.role || 'system',
+        speaker: m.speaker || '',
+        content: m.content || '',
+        turnIndex: m.turnIndex != null ? m.turnIndex : i,
+        isDirectorDecision: !!m.isDirectorDecision,
+      }));
+
+      // Worldbooks with more detail
+      S.worldBooks = (snap.worldBooks || []).map((w) => ({
+        id: w.id || '', title: w.title || '',
+        keys: w.keys || [], content: w.content || '',
+        enabled: w.enabled !== false,
+        hit: false, hitReason: '',
+      }));
+
+      // Jailbreak
+      const jb = snap.jailbreak || {};
+      S.jailbreak = {
+        text: jb.text || '', source: jb.source || 'none',
+        enabled: !!jb.enabled, name: jb.name || '',
+      };
+
+      $dot.className = 'td-dot on';
+      $dot.title = '已连接';
+      $summary.textContent = S.characters.length + '角色 · ' + S.messages.length + '消息';
+    } catch {
+      S.connected = false;
+      $dot.className = 'td-dot off';
+      $dot.title = '未连接';
+      $summary.textContent = '未连接';
     }
+  }
 
-    function render() { if (S.collapsed) return; S.currentTab === "console" ? renderConsole() : renderSettings(); }
+  function doDirector(opts) {
+    S.directorStatus = 'thinking';
+    $dot.className = 'td-dot thinking';
+    $dot.title = '思考中...';
+    render();
+    const TD = getTD();
+    try {
+      const plan = TD.autoPlan?.(opts);
+      if (plan?.decision) {
+        const sel = new Set(plan.decision.selectedRoleIds || []);
+        S.characters.forEach(c => { c.isSelected = sel.has(c.id); });
 
-    function renderConsole() {
-        if (!$body) return;
-        var c = S.characters;
-        var cHTML = !c.length ? '<div class="td-empty">等待数据...</div>' : c.map(function(x) {
-            return '<div class="td-char-row"><span class="td-char-dot '+(x.isSelected?"sel":x.status==="disabled"?"skip":"")+'"></span><span class="td-char-name" style="'+(x.status==="disabled"?"opacity:.4;text-decoration:line-through":"")+'">'+esc(x.name)+(x.isNarrator?" (旁白)":"")+'</span></div>';
-        }).join("");
-        var lHTML = !S.logs.length ? '<div class="td-empty">尚未执行调度</div>' : S.logs.slice(0,5).map(function(l) {
-            var names = l.selectedRoles.map(function(id) { var cc = c.find(function(x){return x.id===id}); return cc?cc.name:id; }).join("、") || "无";
-            return '<div class="td-log-item"><span style="color:#5a5a78">'+new Date(l.timestamp).toLocaleTimeString()+'</span> <span class="td-log-roles">'+esc(names)+'</span><div class="td-log-reason">'+esc(l.reason)+'</div></div>';
-        }).join("");
-        $body.innerHTML = '<div class="td-section"><div class="td-section-title">👥 角色 ('+c.length+')</div>'+cHTML+'</div><div class="td-section"><div class="td-section-title">🎯 操作</div><div class="td-actions"><button class="td-act primary" id="td-run">🎯 导演决定</button><button class="td-act" id="td-spk">👤 指定发言</button></div><div class="td-actions" style="margin-top:5px"><button class="td-act" id="td-all">📢 全员旁白</button><button class="td-act" id="td-rr">🔄 全员轮流</button></div><div class="td-actions" style="margin-top:5px"><button class="td-act" id="td-auto">⚡ 全自动</button></div></div><div class="td-section"><div class="td-section-title">📋 最近调度</div>'+lHTML+'</div>';
-        setTimeout(function() {
-            var r=document.getElementById("td-run"), s=document.getElementById("td-spk"), a=document.getElementById("td-all"), rr=document.getElementById("td-rr"), aa=document.getElementById("td-auto");
-            if(r)r.onclick=function(){doDirector({})}; if(s)s.onclick=doSelectSpeakers;
-            if(a)a.onclick=function(){doAllSpeak("parallel")}; if(rr)rr.onclick=function(){doAllSpeak("sequential")};
-            if(aa)aa.onclick=doFullAuto;
-        }, 50);
+        // Mark worldbook hits
+        const wbSet = new Set(plan.decision.selectedWorldBookIds || []);
+        S.worldBooks.forEach(w => {
+          w.hit = wbSet.has(w.id);
+          w.hitReason = wbSet.has(w.id) ? '导演选中' : '';
+        });
+
+        S.logs.unshift({
+          timestamp: Date.now(),
+          selectedRoles: plan.decision.selectedRoleIds || [],
+          orderedRoles: plan.decision.orderedRoleIds || [],
+          skippedRoles: plan.decision.skippedRoleIds || [],
+          reason: plan.decision.reason || '',
+          mode: plan.config?.mode || 'sequential',
+        });
+        if (S.logs.length > 50) S.logs.length = 50;
+        S.directorStatus = 'done';
+        $dot.className = 'td-dot on';
+        $dot.title = '已完成';
+      } else {
+        showBanner('调度返回空结果', 'err');
+        S.directorStatus = 'idle';
+        $dot.className = 'td-dot on';
+        $dot.title = '待命';
+      }
+    } catch (e) {
+      showBanner('调度失败: ' + String(e), 'err');
+      S.directorStatus = 'error';
+      $dot.className = 'td-dot off';
+      $dot.title = '错误';
     }
+    render();
+    setTimeout(() => {
+      S.directorStatus = 'idle';
+      $dot.className = 'td-dot on';
+      $dot.title = '待命';
+    }, 2000);
+  }
 
-    function renderSettings() {
-        if (!$body) return;
-        var TD = getTD(), raw = TD.settings&&TD.settings.getRaw?TD.settings.getRaw():{};
-        var fb = ""; try { fb = (raw.fallbackModels||[]).join(", "); } catch(e) {}
-        var co = ""; try {
-            var snap = TD.getSnapshot?TD.getSnapshot():{};
-            (snap.characters||[]).forEach(function(c) {
-                var m = (raw.roleModels&&raw.roleModels[c.id])||"";
-                co += '<div class="td-bind-row"><span style="width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(c.displayName||c.name)+'</span><input class="td-bind-model" data-rid="'+esc(c.id)+'" value="'+esc(m)+'" placeholder="模型名" style="flex:1;padding:3px 6px;background:#0f0f1a;border:1px solid #2a2a4a;border-radius:3px;color:#e0e0e0;font-size:10px"></div>';
-            });
-        } catch(e) {}
-        var wb = ""; try { var b = raw.worldbookBindings||{}; wb = Object.entries(b).map(function(e){return e[0]+":"+e[1].join(",")}).join("\n"); } catch(e) {}
-        $body.innerHTML = '<div class="td-section"><div class="td-section-title">🔧 模型配置</div><div class="td-field"><label>默认模型</label><input id="td-cfg-dm" value="'+esc(raw.defaultModel||"")+'" placeholder="openai/gpt-4o"></div><div class="td-field"><label>导演模型 '+(raw.directorModel?"✅":"⚠️")+'</label><input id="td-cfg-dim" value="'+esc(raw.directorModel||"")+'" placeholder="anthropic/claude-opus-4-8"></div><div class="td-field"><label>降级模型链</label><input id="td-cfg-fb" value="'+esc(fb)+'" placeholder="model-a, model-b"></div><div class="td-field"><label>角色→模型</label>'+co+'</div></div><div class="td-section"><div class="td-section-title">📝 破限</div><textarea id="td-cfg-jb" placeholder="自定义破限...">'+esc(raw.jailbreakText||"")+'</textarea></div><div class="td-section"><div class="td-section-title">🔗 世界书绑定</div><textarea id="td-cfg-wb" style="width:100%;min-height:50px;margin-top:4px;background:#0f0f1a;border:1px solid #2a2a4a;color:#e0e0e0;font-size:10px;border-radius:4px;padding:4px" placeholder="entryId:charId,charId">'+esc(wb)+'</textarea></div><div class="td-section"><div class="td-section-title">💾 数据</div><div class="td-actions"><button class="td-act" id="td-exp">📥 导出</button><button class="td-act" id="td-imp">📤 导入</button><button class="td-act" id="td-rst" style="border-color:#f44336;color:#f44336">⚠️ 重置</button></div><div class="td-actions" style="margin-top:5px"><button class="td-act" id="td-save">💾 保存</button></div></div>';
-        setTimeout(function() {
-            var sv=document.getElementById("td-save"), ex=document.getElementById("td-exp"), im=document.getElementById("td-imp"), rs=document.getElementById("td-rst");
-            if(sv)sv.onclick=saveSettings; if(ex)ex.onclick=function(){ var j=TD.exportConfig?TD.exportConfig():"{}"; if(navigator.clipboard)navigator.clipboard.writeText(j).then(function(){showBanner("已复制","ok")}); };
-            if(im)im.onclick=function(){ var inp=document.createElement("input");inp.type="file";inp.accept=".json";inp.onchange=function(){var f=inp.files[0];if(!f)return;var r2=new FileReader();r2.onload=function(){var res=TD.importConfig?TD.importConfig(r2.result):{success:false,message:"不可用"};showBanner(res.message,res.success?"ok":"err");if(res.success)setTimeout(render,300)};r2.readAsText(f)};inp.click(); };
-            if(rs)rs.onclick=function(){if(confirm("确定重置？")){if(TD.resetConfig)TD.resetConfig();showBanner("已重置","ok");setTimeout(render,300)}};
-        }, 50);
-    }
-
-    function saveSettings() {
-        var TD = getTD();
-        var dm = (document.getElementById("td-cfg-dm")||{}).value||"";
-        var dim = (document.getElementById("td-cfg-dim")||{}).value||"";
-        var fb = ((document.getElementById("td-cfg-fb")||{}).value||"").split(",").map(function(s){return s.trim()}).filter(Boolean);
-        var jb = (document.getElementById("td-cfg-jb")||{}).value||"";
-        var wb = (document.getElementById("td-cfg-wb")||{}).value||"";
-        if(TD.setDefaultModel)TD.setDefaultModel(dm);
-        if(TD.setDirectorModel)TD.setDirectorModel(dim);
-        if(TD.setFallbackModels)TD.setFallbackModels(fb);
-        if(TD.setJailbreak)TD.setJailbreak(jb);
-        var binds = {};
-        wb.split("\n").forEach(function(l){ var p=l.split(":").map(function(s){return s.trim()}); if(p[0]&&p[1])binds[p[0]]=p[1].split(",").map(function(s){return s.trim()}).filter(Boolean); });
-        if(TD.settings&&TD.settings.setWorldbookBindings)TD.settings.setWorldbookBindings(binds);
-        document.querySelectorAll(".td-bind-model").forEach(function(inp){ var rid=inp.dataset.rid||"", mid=inp.value.trim(); if(rid&&mid&&TD.setRoleModel)TD.setRoleModel(rid,mid); });
-        showBanner("配置已保存 ✅","ok");
-    }
-
-    // ── Actions ──
-    function doDirector(opts) {
-        var TD = getTD();
-        try {
-            var plan = TD.autoPlan?TD.autoPlan(opts):null;
-            if (plan&&plan.decision) {
-                var sel = {}; (plan.decision.selectedRoleIds||[]).forEach(function(id){sel[id]=true});
-                S.characters.forEach(function(c){c.isSelected=!!sel[c.id]});
-                S.logs.unshift({timestamp:Date.now(),selectedRoles:plan.decision.selectedRoleIds||[],orderedRoles:plan.decision.orderedRoleIds||[],reason:plan.decision.reason||""});
-                if(S.logs.length>50)S.logs.length=50;
-            } else { showBanner("调度返回空结果","err"); }
-        } catch(e) { showBanner("调度失败: "+String(e),"err"); }
-        syncData(); render();
-    }
-    function doSelectSpeakers() { var TD=getTD(); syncData(); if(!TD.selectSpeakers)return; TD.selectSpeakers({title:"选择谁来说话",multi:true,maxSelect:8}).then(function(r){if(!r||!r.confirmed)return;var sel={};r.selectedIds.forEach(function(id){sel[id]=true});S.characters.forEach(function(c){c.isSelected=!!sel[c.id]});render();doDirector({manualSpeakerIds:r.selectedIds,maxRoles:r.selectedIds.length})}); }
-    function doAllSpeak(mode) { var en=S.characters.filter(function(c){return c.status!=="disabled"});if(!en.length){showBanner("没有可用角色","warn");return}doDirector({manualSpeakerIds:en.map(function(c){return c.id}),maxRoles:en.length,orderStrategy:mode==="sequential"?"round-robin":undefined}); }
-    function doFullAuto() { var TD=getTD();showBanner("⏳ 全自动执行中...","warn");try{var p=TD.fullAuto?TD.fullAuto():null;if(p&&p.then){p.then(function(r){S.logs.unshift({timestamp:Date.now(),selectedRoles:(r.plan&&r.plan.decision&&r.plan.decision.selectedRoleIds)||[],orderedRoles:[],reason:"全自动完成"});if(S.logs.length>50)S.logs.length=50;showBanner("✅ 完成: "+(r.report&&r.report.successCount||0)+" 成功","ok");syncData();render()}).catch(function(e){showBanner("全自动失败: "+String(e),"err");syncData();render()})}}catch(e){showBanner("全自动失败: "+String(e),"err")} }
-
-    // ── 事件 ──
-    fab.addEventListener("click", function(e) { if (fab._wasDragged) { fab._wasDragged = false; console.log("[TD] click ignored (was dragged)"); return; } console.log("[TD] FAB clicked, panel visible:", panel.classList.contains("show")); panel.classList.contains("show") ? closePanel() : openPanel(); });
-    document.getElementById("td-btn-close").addEventListener("click", function(e) { e.stopPropagation(); closePanel(); });
-    $btnMin.addEventListener("click", function() { S.collapsed ? expandP() : collapse(); });
-    if ($tabs.length >= 2) {
-        $tabs[0].addEventListener("click", function() { S.currentTab="console"; $tabs[0].classList.add("active"); $tabs[1].classList.remove("active"); render(); });
-        $tabs[1].addEventListener("click", function() { S.currentTab="settings"; $tabs[1].classList.add("active"); $tabs[0].classList.remove("active"); render(); });
-    }
-
-    // ── FAB 拖拽 ──
-    var dragging = false, sx, sy, sl, st;
-    function ds(e) { dragging=true; fab._wasDragged=false; fab.classList.add("dragging"); var p=e.touches?e.touches[0]:e; sx=p.clientX; sy=p.clientY; sl=fab.offsetLeft; st=fab.offsetTop; /* 不在这里preventDefault,否则移动端click被吞 */ }
-    function dm(e) { if(!dragging)return; var p=e.touches?e.touches[0]:e; var dx=p.clientX-sx, dy=p.clientY-sy; if(Math.abs(dx)>3||Math.abs(dy)>3){fab._wasDragged=true; if(e.cancelable)e.preventDefault();} var nx=sl+dx, ny=st+dy; nx=Math.max(0,Math.min(nx,window.innerWidth-fab.offsetWidth)); ny=Math.max(0,Math.min(ny,window.innerHeight-fab.offsetHeight)); fab.style.left=nx+"px"; fab.style.top=ny+"px"; if(panel.classList.contains("show"))panelPos(); }
-    function de() { if(!dragging)return; dragging=false; fab.classList.remove("dragging"); try{localStorage.setItem("td-fab-pos",JSON.stringify({x:fab.offsetLeft,y:fab.offsetTop}))}catch(e){} }
-    fab.addEventListener("touchstart", ds, {passive:true}); fab.addEventListener("mousedown", ds);
-    document.addEventListener("touchmove", dm, {passive:false}); document.addEventListener("mousemove", dm);
-    document.addEventListener("touchend", de); document.addEventListener("mouseup", de);
-
-    // ── 面板拖拽 ──
-    var pd=false, pdx,pdy;
-    var hdr = document.getElementById("td-header");
-    hdr.addEventListener("touchstart", function(e) { if(e.target.tagName==="BUTTON")return; pd=true; var p=e.touches[0]; pdx=p.clientX-panel.offsetLeft; pdy=p.clientY-panel.offsetTop; }, {passive:true});
-    hdr.addEventListener("mousedown", function(e) { if(e.target.tagName==="BUTTON")return; pd=true; pdx=e.clientX-panel.offsetLeft; pdy=e.clientY-panel.offsetTop; });
-    document.addEventListener("touchmove", function(e) { if(!pd)return; var p=e.touches[0]; panel.style.left=(p.clientX-pdx)+"px"; panel.style.top=(p.clientY-pdy)+"px"; });
-    document.addEventListener("mousemove", function(e) { if(!pd)return; panel.style.left=(e.clientX-pdx)+"px"; panel.style.top=(e.clientY-pdy)+"px"; });
-    document.addEventListener("touchend", function() { pd=false; }); document.addEventListener("mouseup", function() { pd=false; });
-
-    // ── 启动 ──
+  async function doSelectSpeakers() {
+    const TD = getTD();
     syncData();
-    console.log("[TD] 浮动面板注入完成 ✅ (可拖拽FAB)");
+    const result = await TD.selectSpeakers({ title: '选择谁来说话', multi: true, maxSelect: 8 });
+    if (!result?.confirmed || !result.selectedIds.length) return;
+    const sel = new Set(result.selectedIds);
+    S.characters.forEach(c => { c.isSelected = sel.has(c.id); });
+    render();
+    doDirector({ manualSpeakerIds: result.selectedIds, maxRoles: result.selectedIds.length });
+  }
 
-    setInterval(function() {
-        if (panel.classList.contains("show") && !S.collapsed) { syncData(); if (S.currentTab==="console") renderConsole(); }
+  function doAllSpeak(mode) {
+    const enabled = S.characters.filter(c => c.status !== 'disabled');
+    if (!enabled.length) { showBanner('没有可用的角色', 'warn'); return; }
+    doDirector({
+      manualSpeakerIds: enabled.map(c => c.id),
+      maxRoles: enabled.length,
+      orderStrategy: mode === 'sequential' ? 'round-robin' : undefined,
+    });
+  }
+
+  async function doFullAuto() {
+    const TD = getTD();
+    S.directorStatus = 'thinking';
+    $dot.className = 'td-dot thinking';
+    $dot.title = '执行中...';
+    try {
+      showBanner('⏳ 全自动执行中...', 'warn');
+      const res = await TD.fullAuto?.();
+      if (res) {
+        const dec = res.plan?.decision || {};
+        S.logs.unshift({
+          timestamp: Date.now(),
+          selectedRoles: dec.selectedRoleIds || [],
+          orderedRoles: dec.orderedRoleIds || [],
+          skippedRoles: dec.skippedRoleIds || [],
+          reason: dec.reason || '全自动执行完成',
+          mode: 'auto',
+        });
+        if (S.logs.length > 50) S.logs.length = 50;
+        S.directorStatus = 'done';
+        $dot.className = 'td-dot on';
+        $dot.title = '已完成';
+        showBanner(`✅ 完成：${res.report?.successCount || 0} 成功，${res.report?.failedCount || 0} 失败`, 'ok');
+      }
+    } catch (e) {
+      showBanner('全自动失败: ' + String(e), 'err');
+      S.directorStatus = 'error';
+      $dot.className = 'td-dot off';
+      $dot.title = '错误';
+    }
+    syncData();
+    render();
+    setTimeout(() => {
+      S.directorStatus = 'idle';
+      $dot.className = 'td-dot on';
+      $dot.title = '待命';
     }, 3000);
+  }
+
+  // ═══════════════════════════════════════════════════
+  // Banner
+  // ═══════════════════════════════════════════════════
+  let bannerTimer = null;
+  function showBanner(msg, type = 'warn') {
+    $banner.innerHTML = '<div class="td-banner ' + type + '">' + esc(msg) + '</div>';
+    if (bannerTimer) clearTimeout(bannerTimer);
+    if (type !== 'err') bannerTimer = setTimeout(() => { $banner.innerHTML = ''; }, 4000);
+  }
+
+  // ═══════════════════════════════════════════════════
+  // Auto-refresh & startup
+  // ═══════════════════════════════════════════════════
+  syncData();
+  hidePanel();
+  console.log('[TavernDirector] 浮动面板注入完成 ✅ (FAB模式 · 3 Tab · 数据预览 · 持久化)');
+
+  // 监听 writer.notifyUI 的执行完成事件
+  window.addEventListener('tavern-director:execution-complete', ((e) => {
+    const d = e.detail;
+    showBanner(`✅ 执行完成：${d.successCount} 成功 / ${d.failedCount} 失败 / ${d.totalTokens} tokens`, d.failedCount > 0 ? 'warn' : 'ok');
+    syncData();
+    render();
+  }));
+
+  // 周期性同步（仅在面板打开时）
+  setInterval(() => {
+    if (!S.collapsed && $panel.style.display !== 'none') {
+      syncData();
+      render();
+    }
+  }, 3000);
 }
 
+// ─── Util ────────────────────────────────────────────
+function esc(s) {
+  return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
 
-    function esc(s) {
-        return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-    }
 
     /**
      * 酒馆导演插件 —— 浏览器端启动入口

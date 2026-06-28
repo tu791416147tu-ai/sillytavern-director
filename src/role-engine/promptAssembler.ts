@@ -294,7 +294,7 @@ export function trimPromptToLimit(prompt: string, maxTokens: number): string {
     }
 
     // 指令和输出格式必须保留，即使略微超出 token 预算
-    const isCritical = section.startsWith('【指令】') || section.startsWith('【输出格式】');
+    const isCritical = section.startsWith('【本轮任务】') || section.startsWith('【输出要求】');
     if (charCount + sectionChars > maxChars && !isCritical) break;
     result += (result ? '\n\n' : '') + section;
     charCount += sectionChars;
