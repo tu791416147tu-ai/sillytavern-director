@@ -17,7 +17,7 @@
 
 export function injectFloatingPanel(): void {
   // ── 悬浮窗图标 (WebP base64, 300x300, ~14KB) ──
-  const FAB_ICON = 'data:image/webp;base64,UklGRh43AABXRUJQVlA4IBI3AADw8ACdASosASwBPpFAmkmlo6IkJ7SciLASCWMAwzLvWSt/3k+ZNynTe+A73/Cl6hf7xvLedq073ooPSEx7OVvzlx0df/3LajwB2r/FP1wdr/7T4hz7O0swN/z/+76cfvP+q9gH80/Lh8XL8T/2vYC/oP979ZX/g8uv7F/Me/+x5QAAAAA';
+  const FAB_IMG = '/scripts/extensions/third-party/sillytavern-director/fab-icon.webp';
 
   // 防止重复注入
   if ((window as any).__tdFloatingInjected) {
@@ -48,12 +48,12 @@ export function injectFloatingPanel(): void {
   css.id = 'td-floating-style';
   css.textContent = `
 #td-floating-root{position:fixed;z-index:2147483640;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans SC",sans-serif;font-size:12px;line-height:1.5;color:#e0e0e0}
-#td-fab{position:fixed;right:20px;bottom:20px;z-index:2147483641;width:52px;height:52px;border-radius:50%;background:rgba(22,33,62,.9);color:#fff;border:3px solid #e94560;cursor:pointer;font-size:16px;box-shadow:0 0 0 3px rgba(255,255,255,.25),0 0 24px rgba(233,69,96,.7),0 0 48px rgba(233,69,96,.3);transition:.2s;display:flex;align-items:center;justify-content:center;padding:0;overflow:hidden;animation:td-fab-pulse 3s ease-in-out infinite}
+#td-fab{position:fixed;left:20px;top:20px;z-index:2147483641;width:52px;height:52px;border-radius:50%;background:rgba(22,33,62,.9);color:#fff;border:3px solid #e94560;cursor:pointer;font-size:16px;box-shadow:0 0 0 3px rgba(255,255,255,.25),0 0 24px rgba(233,69,96,.7),0 0 48px rgba(233,69,96,.3);transition:.2s;display:flex;align-items:center;justify-content:center;padding:0;overflow:hidden;animation:td-fab-pulse 3s ease-in-out infinite}
 #td-fab img{width:100%;height:100%;object-fit:cover;border-radius:50%}
-#td-fab:hover{transform:scale(1.12);border-color:#ff6b81;box-shadow:0 0 0 4px rgba(255,255,255,.4),0 0 32px rgba(233,69,96,.85),0 0 56px rgba(233,69,96,.45)}
+#td-fab{cursor:grab}#td-fab:hover{transform:scale(1.12);border-color:#ff6b81;box-shadow:0 0 0 4px rgba(255,255,255,.4),0 0 32px rgba(233,69,96,.85),0 0 56px rgba(233,69,96,.45)}
 @keyframes td-fab-pulse{0%,100%{box-shadow:0 0 0 3px rgba(255,255,255,.25),0 0 24px rgba(233,69,96,.7),0 0 48px rgba(233,69,96,.3)}50%{box-shadow:0 0 0 5px rgba(255,255,255,.45),0 0 36px rgba(233,69,96,.9),0 0 60px rgba(233,69,96,.5)}}
 #td-fab.hidden{display:none}
-#td-panel{position:fixed;right:16px;bottom:72px;z-index:2147483640;width:380px;max-height:82vh;background:#1a1a2e;border:1px solid #2a2a4a;border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,.5);overflow:hidden;display:flex;flex-direction:column;transition:.2s;resize:both;min-width:320px}
+#td-panel{position:fixed;left:16px;top:72px;z-index:2147483640;width:380px;max-height:82vh;background:#1a1a2e;border:1px solid #2a2a4a;border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,.5);overflow:hidden;display:flex;flex-direction:column;transition:.2s;resize:both;min-width:320px}
 #td-panel.collapsed{max-height:40px;resize:none}
 #td-header{display:flex;align-items:center;gap:8px;padding:10px 12px;background:#16213e;cursor:grab;user-select:none;flex-shrink:0}
 #td-header:active{cursor:grabbing}
@@ -162,8 +162,8 @@ export function injectFloatingPanel(): void {
 
 /* 响应式 */
 @media (max-width: 480px) {
-  #td-fab{right:12px;bottom:12px;width:60px;height:60px;border-radius:50%}
-  #td-panel{right:4px;bottom:64px;width:calc(100vw - 8px);max-height:62vh;border-radius:8px;font-size:13px;resize:none;min-width:auto}
+  #td-fab{left:12px;top:12px;width:60px;height:60px;border-radius:50%}
+  #td-panel{left:4px;top:64px;width:calc(100vw - 8px);max-height:62vh;border-radius:8px;font-size:13px;resize:none;min-width:auto}
   #td-panel.collapsed{max-height:44px}
   #td-header{padding:12px;font-size:14px}
   .td-act{padding:8px 10px;font-size:11px;min-width:55px}
@@ -199,7 +199,7 @@ export function injectFloatingPanel(): void {
   const root = document.createElement('div');
   root.id = 'td-floating-root';
   root.innerHTML = `
-<button id="td-fab" title="酒馆导演台"><img src="${FAB_ICON}" alt="导演" width="48" height="48" /></button>
+<button id="td-fab" title="酒馆导演台"><img src="${FAB_IMG}" alt="导演" width="48" height="48" /></button>
 <div id="td-panel">
   <div id="td-header">
     <span class="td-dot off" id="td-dot" title="连接状态"></span>
@@ -278,8 +278,12 @@ export function injectFloatingPanel(): void {
   $btnMin.addEventListener('click', () => S.collapsed ? expand() : collapse());
 
   function hidePanel() { $panel.style.display = 'none'; $fab.classList.remove('hidden'); }
+  
   function showPanel() {
     try {
+      // 面板跟随FAB位置
+      $panel.style.left = Math.min($fab.offsetLeft, window.innerWidth - 400) + 'px';
+      $panel.style.top = Math.min($fab.offsetTop + 60, window.innerHeight - 300) + 'px';
       $panel.style.display = 'flex';
       $fab.classList.add('hidden');
       expand();
@@ -289,8 +293,66 @@ export function injectFloatingPanel(): void {
       $fab.classList.remove('hidden');
     }
   }
-  document.getElementById('td-btn-close')!.addEventListener('click', hidePanel);
+  document.getElementById('td-btn-close').addEventListener('click', hidePanel);
   $fab.addEventListener('click', showPanel);
+  // ── FAB 自由拖动 + 位置持久化 ──────────
+  function loadFabPos() {
+    try {
+      const saved = localStorage.getItem('td-fab-pos');
+      if (saved) {
+        const pos = JSON.parse(saved);
+        if (typeof pos.left === 'number' && typeof pos.top === 'number') {
+          $fab.style.left = pos.left + 'px';
+          $fab.style.top = pos.top + 'px';
+        }
+      }
+    } catch { /* ignore */ }
+  }
+  function saveFabPos() {
+    try {
+      localStorage.setItem('td-fab-pos', JSON.stringify({
+        left: $fab.offsetLeft,
+        top: $fab.offsetTop,
+      }));
+    } catch { /* ignore */ }
+  }
+  loadFabPos();
+
+  // FAB drag
+  let fabDragging = false, fabStartX = 0, fabStartY = 0, fabOrigLeft = 0, fabOrigTop = 0;
+  function fabDragStart(e) {
+    if (e.button !== undefined && e.button !== 0) return; // only left click
+    fabDragging = true;
+    const p = 'touches' in e ? e.touches[0] : e;
+    fabStartX = p.clientX;
+    fabStartY = p.clientY;
+    fabOrigLeft = $fab.offsetLeft;
+    fabOrigTop = $fab.offsetTop;
+    $fab.style.cursor = 'grabbing';
+    $fab.style.transition = 'none';
+    e.preventDefault();
+  }
+  function fabDragMove(e) {
+    if (!fabDragging) return;
+    const p = 'touches' in e ? e.touches[0] : e;
+    const dx = p.clientX - fabStartX;
+    const dy = p.clientY - fabStartY;
+    $fab.style.left = Math.max(0, Math.min(window.innerWidth - 52, fabOrigLeft + dx)) + 'px';
+    $fab.style.top = Math.max(0, Math.min(window.innerHeight - 52, fabOrigTop + dy)) + 'px';
+  }
+  function fabDragEnd() {
+    if (!fabDragging) return;
+    fabDragging = false;
+    $fab.style.cursor = 'pointer';
+    $fab.style.transition = '.2s';
+    saveFabPos();
+  }
+  $fab.addEventListener('mousedown', fabDragStart);
+  $fab.addEventListener('touchstart', fabDragStart, { passive: false });
+  document.addEventListener('mousemove', fabDragMove);
+  document.addEventListener('touchmove', fabDragMove, { passive: false });
+  document.addEventListener('mouseup', fabDragEnd);
+  document.addEventListener('touchend', fabDragEnd);
 
   // ── Draggable header (mouse + touch) ──────────
   let dragging = false, offX = 0, offY = 0;
